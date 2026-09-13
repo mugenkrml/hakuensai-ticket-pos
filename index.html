@@ -14,6 +14,7 @@
       <div class="header-left">
         <h1 class="header-title">柏苑祭運営 金券管理システム</h1>
         <span class="day-badge" id="currentDayBadgeMenu">1日目</span>
+        <span class="prod-badge" id="prodModeBadgeMenu">本番モード</span>
         <div class="status-badge status-online" id="statusBadgeMenu">
           <span class="status-dot"></span>
           <span class="status-text">オンライン</span>
@@ -31,17 +32,17 @@
     <main class="menu-content">
       <button class="btn btn-sale" onclick="openSaleScreen()">
         <span class="btn-text-large">金券販売</span>
-        <span class="btn-subtext">購入受付</span>
+        <span class="btn-subtext">購入受付 (セット販売)</span>
       </button>
 
       <button class="btn btn-refund" onclick="openRefundScreen()">
         <span class="btn-text-medium">返金処理</span>
-        <span class="btn-subtext-refund">金券回収・払出</span>
+        <span class="btn-subtext-refund">使い残し回収 (バラ返金)</span>
       </button>
 
       <div class="sub-actions">
         <button class="btn btn-sub" onclick="openManageScreen()">集計・管理</button>
-        <button class="btn btn-sub" onclick="openSettingsScreen()">レジ設定</button>
+        <button class="btn btn-sub" onclick="openSettingsScreen()">レジ設定・精算</button>
       </div>
     </main>
   </div>
@@ -62,10 +63,10 @@
 
     <div class="display-container" onclick="collapseTray('saleKeypadTray')">
       <div class="display-row" id="rowSheetCount">
-        <span class="display-label">購入枚数</span>
+        <span class="display-label">購入枚数 (セット)</span>
         <div class="display-value-wrap">
           <span class="display-val" id="sheetCount">0</span>
-          <span class="display-unit">枚</span>
+          <span class="display-unit">セット</span>
         </div>
       </div>
 
@@ -183,8 +184,12 @@
     </header>
 
     <div class="display-container" onclick="collapseTray('refundKeypadTray')">
+      <!-- バラ表記ガイド付き枚数入力 -->
       <div class="display-row" id="rowRefundSheetCount">
-        <span class="display-label">返金枚数</span>
+        <div class="refund-label-wrap">
+          <span class="display-label">返金枚数</span>
+          <span class="refund-sub-guide" id="refundRateGuide">バラ (50円 / 枚)</span>
+        </div>
         <div class="display-value-wrap">
           <span class="display-val text-refund" id="refundSheetCount">0</span>
           <span class="display-unit">枚</span>
@@ -230,7 +235,7 @@
     </div>
   </div>
 
-  <!-- ==================== 5. 集計・管理画面（3タブ化） ==================== -->
+  <!-- ==================== 5. 集計・管理画面 ==================== -->
   <div id="screenManage" class="screen-view">
     <header class="header">
       <div class="header-left">
@@ -248,7 +253,6 @@
       </div>
     </header>
 
-    <!-- 3タブバー -->
     <div class="manage-nav-tabs">
       <button class="manage-nav-btn active" id="tabNavSummary" onclick="switchMainTab('summary')">📊 総合サマリー</button>
       <button class="manage-nav-btn" id="tabNavSale" onclick="switchMainTab('sale')">💰 販売履歴</button>
@@ -258,7 +262,7 @@
     <!-- タブ1: 総合サマリービュー -->
     <div class="manage-tab-content active" id="tabContentSummary">
       <div class="summary-hero-card">
-        <span class="hero-label">本日純売上（販売 − 返金）</span>
+        <span class="hero-label">本日純売上（総販売額 − 総返金額）</span>
         <div class="hero-val-wrap">
           <span class="hero-val" id="sumNetSales">0</span>
           <span class="hero-unit">円</span>
@@ -268,40 +272,37 @@
       <div class="summary-breakdown-grid">
         <div class="breakdown-card card-sale-side">
           <span class="breakdown-title">販売合計</span>
-          <div class="breakdown-row">
-            <span>枚数:</span>
-            <strong><span id="sumSaleSheets">0</span> 枚</strong>
-          </div>
-          <div class="breakdown-row">
-            <span>金額:</span>
-            <strong><span id="sumSaleAmount">0</span> 円</strong>
-          </div>
-          <div class="breakdown-row">
-            <span>件数:</span>
-            <span><span id="sumSaleOrders">0</span> 件</span>
-          </div>
+          <div class="breakdown-row"><span>総販売数:</span><strong><span id="sumSaleSheets">0</span> セット</strong></div>
+          <div class="breakdown-row"><span>総売上額:</span><strong><span id="sumSaleAmount">0</span> 円</strong></div>
+          <div class="breakdown-row"><span>有効件数:</span><span><span id="sumSaleOrders">0</span> 件</span></div>
         </div>
 
         <div class="breakdown-card card-refund-side">
           <span class="breakdown-title">返金合計 (払出)</span>
-          <div class="breakdown-row">
-            <span>枚数:</span>
-            <strong><span id="sumRefundSheets">0</span> 枚</strong>
-          </div>
-          <div class="breakdown-row">
-            <span>金額:</span>
-            <strong><span id="sumRefundAmount">0</span> 円</strong>
-          </div>
-          <div class="breakdown-row">
-            <span>件数:</span>
-            <span><span id="sumRefundOrders">0</span> 件</span>
-          </div>
+          <div class="breakdown-row"><span>回収枚数:</span><strong><span id="sumRefundSheets">0</span> 枚</strong></div>
+          <div class="breakdown-row"><span>返金総額:</span><strong><span id="sumRefundAmount">0</span> 円</strong></div>
+          <div class="breakdown-row"><span>返金件数:</span><span><span id="sumRefundOrders">0</span> 件</span></div>
         </div>
       </div>
     </div>
 
-    <!-- タブ2: 販売履歴ビュー -->
+    <!-- タブ2: 販売履歴ビュー（トップにサマリー見出しを完全復活） -->
     <div class="manage-tab-content" id="tabContentSale">
+      <div class="history-stat-grid">
+        <div class="stat-pill-card">
+          <span class="stat-pill-label">合計販売数</span>
+          <span class="stat-pill-val" id="saleTabTotalSheets">0 セット</span>
+        </div>
+        <div class="stat-pill-card primary-pill">
+          <span class="stat-pill-label">総売上金額</span>
+          <span class="stat-pill-val" id="saleTabTotalSales">0 円</span>
+        </div>
+        <div class="stat-pill-card">
+          <span class="stat-pill-label">有効取引件数</span>
+          <span class="stat-pill-val" id="saleTabTotalOrders">0 件</span>
+        </div>
+      </div>
+
       <div class="manage-tab-bar">
         <div class="tab-group">
           <button class="tab-btn active" id="subTabActive" onclick="switchSaleSubTab('active')">販売中データ</button>
@@ -328,10 +329,25 @@
       </div>
     </div>
 
-    <!-- タブ3: 返金履歴ビュー -->
+    <!-- タブ3: 返金履歴ビュー（同様にトップサマリー見出し付き） -->
     <div class="manage-tab-content" id="tabContentRefund">
+      <div class="history-stat-grid">
+        <div class="stat-pill-card">
+          <span class="stat-pill-label">総回収枚数 (バラ)</span>
+          <span class="stat-pill-val text-refund" id="refundTabTotalSheets">0 枚</span>
+        </div>
+        <div class="stat-pill-card danger-pill">
+          <span class="stat-pill-label">総返金金額</span>
+          <span class="stat-pill-val" id="refundTabTotalAmount">0 円</span>
+        </div>
+        <div class="stat-pill-card">
+          <span class="stat-pill-label">返金件数</span>
+          <span class="stat-pill-val" id="refundTabTotalOrders">0 件</span>
+        </div>
+      </div>
+
       <div class="manage-tab-bar">
-        <span class="selection-status">返金記録件数: <strong id="refundTotalCountText">0</strong>件</span>
+        <span class="selection-status">返金記録一覧</span>
       </div>
 
       <div class="table-scroll-container">
@@ -351,54 +367,226 @@
     </div>
   </div>
 
-  <!-- ==================== 6. レジ設定画面 ==================== -->
+  <!-- ==================== 6. レジ設定画面 ＆ 精算 ==================== -->
   <div id="screenSettings" class="screen-view">
     <header class="header">
       <div class="header-left">
         <button class="btn-back" onclick="closeSettingsScreen()">メニューへ戻る</button>
-        <h2 class="header-title">レジ設定</h2>
+        <h2 class="header-title">レジ設定・精算</h2>
       </div>
       <div class="header-clock live-clock">--:--:--</div>
     </header>
 
     <div class="settings-scroll-container">
+      <!-- 1. 開催日設定 ＆ 本番モード切替 ＆ 開始トリガー -->
       <div class="settings-card">
-        <h3 class="settings-card-title">開催日設定</h3>
-        <p class="settings-desc">切り替えるとスプレッドシートの参照先（販売・返金データ1 / 2）も自動連動します。</p>
-        <div class="day-toggle-group">
-          <button class="btn-day-select active" id="btnDay1" onclick="setDay('1')">1日目 (Day 1)</button>
-          <button class="btn-day-select" id="btnDay2" onclick="setDay('2')">2日目 (Day 2)</button>
+        <div class="card-head-between">
+          <h3 class="settings-card-title">開催日設定・開始</h3>
+          <button class="btn-prod-toggle" id="btnToggleProdMode" onclick="requestToggleProdMode()">
+            本番モード: <span id="prodModeStatusText">OFF (テスト中)</span>
+          </button>
         </div>
+        <p class="settings-desc">
+          「本番モード ON」の時は、事前有高が入力されるまで開催を開始できません。
+        </p>
+
+        <div class="day-toggle-group">
+          <button class="btn-day-select active" id="btnDay1" onclick="selectDaySetting('1')">1日目 (Day 1)</button>
+          <button class="btn-day-select" id="btnDay2" onclick="selectDaySetting('2')">2日目 (Day 2)</button>
+        </div>
+
+        <div class="initial-cash-field">
+          <label><span id="initialCashLabelDay">1日目</span> 開始前有高 (釣銭準備金):</label>
+          <div class="input-with-unit">
+            <input type="number" id="settingInitialCash" min="0" step="1000" placeholder="例: 30000">
+            <span class="unit-text">円</span>
+          </div>
+        </div>
+
+        <button class="btn-start-day" id="btnStartDay" onclick="startSelectedDay()">
+          🚀 <span id="startDayBtnText">1日目を開始</span>
+        </button>
       </div>
 
+      <!-- 2. 金券単価設定 (セット販売 ＆ バラ返金) -->
       <div class="settings-card">
         <h3 class="settings-card-title">金券単価設定</h3>
         <div class="settings-field-row">
-          <label>金券1枚の価格 (円)</label>
+          <label>販売セット単価 (10枚綴り)</label>
           <div class="input-with-unit">
             <input type="number" id="settingUnitPrice" min="10" step="10">
             <span class="unit-text">円</span>
           </div>
         </div>
-        <button class="btn-settings-save" onclick="saveUnitPriceSetting()">単価を変更</button>
+        <div class="settings-field-row">
+          <label>返金バラ単価 (1枚あたり)</label>
+          <div class="input-with-unit">
+            <input type="number" id="settingRefundUnitPrice" min="5" step="5">
+            <span class="unit-text">円</span>
+          </div>
+        </div>
+        <button class="btn-settings-save" onclick="saveUnitPriceSettings()">単価設定を保存</button>
       </div>
 
+      <!-- 3. スプシGAS URL設定 -->
       <div class="settings-card">
         <h3 class="settings-card-title">スプレッドシート連携 (GAS URL)</h3>
-        <p class="settings-desc">接続先スプレッドシートのWebアプリURLを変更できます。</p>
         <input type="text" id="settingGasUrl" class="input-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
         <button class="btn-settings-save" onclick="saveGasUrlSetting()">URLを保存</button>
       </div>
 
+      <!-- 4. 危険操作（初期化の分離） -->
       <div class="settings-card danger-card">
-        <h3 class="settings-card-title text-danger">⚠️ 端末データのリセット（本番前初期化）</h3>
-        <p class="settings-desc">テスト入力した端末内の全販売・返金データとキューを完全に消去します。<br>実行には管理者パスキーが必要です。</p>
-        <button class="btn-danger-reset" onclick="requestResetWithPasskey()">端末データを完全初期化</button>
+        <h3 class="settings-card-title text-danger">⚠️ データ初期化 (管理者認証)</h3>
+        <p class="settings-desc">目的別に完全に分離して初期化を実行できます。</p>
+        <div class="reset-buttons-grid">
+          <button class="btn-danger-reset" onclick="requestResetLocalOnly()">
+            📱 端末データのみ初期化<br><small>(この端末の販売・返金キャッシュ消去)</small>
+          </button>
+          <button class="btn-danger-reset-all" onclick="requestResetSheetData()">
+            ☁️ スプシデータも完全消去<br><small>(スプシの行をヘッダー残しで全削除)</small>
+          </button>
+        </div>
+      </div>
+
+      <!-- 5. 巨大 日次精算ボタン -->
+      <div class="settlement-launch-section">
+        <button class="btn-launch-settlement" onclick="openSettlementModal()">
+          <span class="settle-btn-sub">レジ締め・現金実査・帳簿突き合わせ</span>
+          <span class="settle-btn-main">📑 日次精算書を作成する</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== 7. 管理者パスキー認証テンキーモーダル ==================== -->
+  <!-- ==================== 7. 貸借対照表 (T勘定) 精算モーダル ==================== -->
+  <div class="modal-backdrop" id="settlementModal">
+    <div class="settle-sheet-card">
+      <div class="settle-header">
+        <div>
+          <h2 class="settle-sheet-title">金券レジ日次精算書 (<span id="settleDayTitle">1日目</span>)</h2>
+          <span class="settle-time" id="settleDateTime">----/--/-- --:--</span>
+        </div>
+        <button class="btn-close-settle" onclick="closeSettlementModal()">✕ 閉じる</button>
+      </div>
+
+      <!-- T勘定 左右対照表 -->
+      <div class="t-account-container">
+        <!-- 左側：受入 (借方) -->
+        <div class="t-side left-side">
+          <div class="t-side-header">【 受 入 (受取・元入) 】</div>
+
+          <div class="t-row t-row-1">
+            <span class="t-label">1. 開始時有高 (準備金)</span>
+            <div class="t-val-wrap">
+              <input type="number" id="settleInitialCash" class="t-input" oninput="recalcSettlement()">
+              <span class="t-unit">円</span>
+            </div>
+          </div>
+
+          <div class="t-row t-row-2">
+            <span class="t-label">2. 販売受領総額</span>
+            <div class="t-val-wrap">
+              <span class="t-fixed-val" id="settleTotalReceived">0</span>
+              <span class="t-unit">円</span>
+            </div>
+          </div>
+
+          <div class="t-row t-row-blank"></div>
+
+          <div class="t-row t-row-blank"></div>
+
+          <div class="t-row t-row-5">
+            <span class="t-label">5. 特殊収入 (両替投入など)</span>
+            <div class="t-val-wrap">
+              <input type="number" id="settleExtraIncome" class="t-input" value="0" oninput="recalcSettlement()">
+              <span class="t-unit">円</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="t-divider"></div>
+
+        <!-- 右側：払出 (貸方) -->
+        <div class="t-side right-side">
+          <div class="t-side-header">【 払 出 (支払・釣銭) 】</div>
+
+          <div class="t-row t-row-blank"></div>
+
+          <div class="t-row t-row-blank"></div>
+
+          <div class="t-row t-row-3">
+            <span class="t-label">3. 販売釣銭総額</span>
+            <div class="t-val-wrap">
+              <span class="t-fixed-val" id="settleTotalChange">0</span>
+              <span class="t-unit">円</span>
+            </div>
+          </div>
+
+          <div class="t-row t-row-4">
+            <span class="t-label">4. 返金総額 (払出)</span>
+            <div class="t-val-wrap">
+              <span class="t-fixed-val text-refund" id="settleTotalRefund">0</span>
+              <span class="t-unit">円</span>
+            </div>
+          </div>
+
+          <div class="t-row t-row-5">
+            <span class="t-label">5. 特殊支出 (立替購入など)</span>
+            <div class="t-val-wrap">
+              <input type="number" id="settleExtraExpense" class="t-input" value="0" oninput="recalcSettlement()">
+              <span class="t-unit">円</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 筆算の合計線 ＆ 各側合計 -->
+      <div class="t-totals-bar">
+        <div class="total-box left-total-box">
+          <span class="t-subtotal-label">受入合計:</span>
+          <span class="t-subtotal-val" id="settleLeftTotal">0 円</span>
+        </div>
+        <div class="total-box right-total-box">
+          <span class="t-subtotal-label">払出合計:</span>
+          <span class="t-subtotal-val" id="settleRightTotal">0 円</span>
+        </div>
+      </div>
+
+      <!-- 下段：残高突き合わせ ＆ 雑益・雑損 -->
+      <div class="settle-reconciliation-panel">
+        <div class="reconcile-row">
+          <span class="rec-label">① 帳簿残高 (受入合計 − 払出合計)</span>
+          <span class="rec-val" id="settleBookBalance">0 円</span>
+        </div>
+
+        <div class="reconcile-row actual-row">
+          <span class="rec-label">② 実際有高 (金庫の現金を数えて入力)</span>
+          <div class="rec-input-wrap">
+            <input type="number" id="settleActualCash" class="rec-input" placeholder="数えた現金額を入力" oninput="recalcSettlement()">
+            <span class="rec-unit">円</span>
+          </div>
+        </div>
+
+        <div class="reconcile-diff-card" id="settleDiffCard">
+          <div class="diff-title-wrap">
+            <span class="diff-title">差異 (雑益 / 雑損)</span>
+            <span class="diff-note">※ [実際有高 − 帳簿残高]</span>
+          </div>
+          <span class="diff-val" id="settleDifference">±0 円</span>
+        </div>
+      </div>
+
+      <div class="settle-footer-actions">
+        <button class="btn-cancel-settle" onclick="closeSettlementModal()">閉じる</button>
+        <button class="btn-confirm-settle" onclick="requestConfirmSettlement()">
+          🔒 パスキーで精算を確定しスプシへ記録
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 8. 管理者パスキー認証テンキーモーダル ==================== -->
   <div class="modal-backdrop" id="passkeyModal">
     <div class="passkey-card">
       <h3 class="passkey-title">管理者認証</h3>
@@ -428,12 +616,12 @@
     </div>
   </div>
 
-  <!-- ==================== 8. 編集モーダル ==================== -->
+  <!-- ==================== 9. 編集モーダル ==================== -->
   <div class="modal-backdrop" id="editModal">
     <div class="edit-card">
       <h3 class="edit-title">取引データの変更 (No.<span id="editNoText"></span>)</h3>
       <div class="edit-field">
-        <label>販売枚数</label>
+        <label>販売セット数</label>
         <input type="number" id="editSheets" min="1" oninput="recalcEdit()">
       </div>
       <div class="edit-field">
@@ -451,7 +639,7 @@
     </div>
   </div>
 
-  <!-- ==================== 9. 完了モーダル ==================== -->
+  <!-- ==================== 10. 完了モーダル ==================== -->
   <div class="modal-backdrop" id="completionModal">
     <div class="success-card" id="successCard">
       <div class="svg-check-wrapper">
@@ -461,7 +649,7 @@
         </svg>
       </div>
       <h2 class="modal-title" id="modalTitle">販売完了</h2>
-      <p class="modal-subtitle" id="modalSummary">0枚 0円</p>
+      <p class="modal-subtitle" id="modalSummary">0セット 0円</p>
     </div>
   </div>
 
