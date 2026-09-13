@@ -1468,3 +1468,72 @@ function fetchFromGAS(isManual) {
 updateSoundUI();
 updateDayUI();
 updateProdModeUI();
+
+// ── 画面右端クイックスクロールバーのタッチ＆ドラッグ制御 ──
+function setupQuickScrollBar(containerId, railId, thumbId) {
+  const container = document.getElementById(containerId);
+  const rail = document.getElementById(railId);
+  const thumb = document.getElementById(thumbId);
+  if (!container || !rail || !thumb) return;
+
+  // コンテナのスクロール位置をつまみに同期
+  function updateThumbPosition() {
+    const scrollHeight = container.scrollHeight - container.clientHeight;
+    if (scrollHeight <= 0) {
+      rail.style.display = "none";
+      return;
+    }
+    rail.style.display = "block";
+    const railHeight = rail.clientHeight - thumb.clientHeight;
+    const currentScrollRatio = container.scrollTop / scrollHeight;
+    thumb.style.top = `${currentScrollRatio * railHeight}px`;
+  }
+
+  container.addEventListener("scroll", updateThumbPosition, { passive: true });
+  window.addEventListener("resize", updateThumbPosition);
+
+  // レールまたはつまみをタップ・ドラッグした時のスクロール処理
+  let isDragging = false;
+
+  function handleTouch(e) {
+    const touch = e.touches ? e.touches[0] : e;
+    const railRect = rail.getBoundingClientRect();
+    const offsetY = touch.clientY - railRect.top - (thumb.clientHeight / 2);
+    const maxRailY = rail.clientHeight - thumb.clientHeight;
+
+    const clampedY = Math.max(0, Math.min(maxRailY, offsetY));
+    const ratio = clampedY / maxRailY;
+
+    container.scrollTop = ratio * (container.scrollHeight - container.clientHeight);
+    updateThumbPosition();
+  }
+
+  rail.addEventListener("touchstart", (e) => {
+    isDragging = true;
+    handleTouch(e);
+  }, { passive: true });
+
+  rail.addEventListener("touchmove", (e) => {
+    if (isDragging) handleTouch(e);
+  }, { passive: true });
+
+  window.addEventListener("touchend", () => { isDragging = false; });
+}
+
+// 画面読み込み時に各スクロールバーを初期化
+document.addEventListener("DOMContentLoaded", () => {
+  setupQuickScrollBar("saleTableContainer", "saleScrollRail", "saleScrollThumb");
+  setupQuickScrollBar("refundTableContainer", "refundScrollRail", "refundScrollThumb");
+});
+
+// 管理画面を開いた時やタブ切り替え時にもスクロールバーを再計算
+const originalRenderAllManageViews = renderAllManageViews;
+renderAllManageViews = function() {
+  originalRenderAllManageViews();
+  setTimeout(() => {
+    const sContainer = document.getElementById("saleTableContainer");
+    if (sContainer) sContainer.dispatchEvent(new Event("scroll"));
+    const rContainer = document.getElementById("refundTableContainer");
+    if (rContainer) rContainer.dispatchEvent(new Event("scroll"));
+  }, 100);
+};

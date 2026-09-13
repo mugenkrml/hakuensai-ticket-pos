@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>柏苑祭運営 金券管理システム</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="金券POS">
+  <!-- キャッシュ強制破棄バージョン付き -->
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -314,7 +318,7 @@
       </div>
     </div>
 
-    <!-- タブ2: 販売履歴 -->
+    <!-- タブ2: 販売履歴（専用スクロールバー付き） -->
     <div class="manage-tab-content" id="tabContentSale">
       <div class="history-stat-grid">
         <div class="stat-pill-card">
@@ -347,17 +351,23 @@
         </div>
       </div>
 
-      <div class="table-scroll-container">
-        <table class="data-table">
-          <thead>
-            <tr id="tableHeaderRow"></tr>
-          </thead>
-          <tbody id="dataTableBody"></tbody>
-        </table>
+      <!-- テーブル ＋ 右端専用クイックスクロールバー -->
+      <div class="table-scroll-wrapper">
+        <div class="table-scroll-container" id="saleTableContainer">
+          <table class="data-table">
+            <thead>
+              <tr id="tableHeaderRow"></tr>
+            </thead>
+            <tbody id="dataTableBody"></tbody>
+          </table>
+        </div>
+        <div class="quick-scrollbar-rail" id="saleScrollRail">
+          <div class="quick-scrollbar-thumb" id="saleScrollThumb"></div>
+        </div>
       </div>
     </div>
 
-    <!-- タブ3: 返金履歴 -->
+    <!-- タブ3: 返金履歴（専用スクロールバー付き） -->
     <div class="manage-tab-content" id="tabContentRefund">
       <div class="history-stat-grid">
         <div class="stat-pill-card">
@@ -378,19 +388,24 @@
         <span class="selection-status">返金記録一覧</span>
       </div>
 
-      <div class="table-scroll-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>返金No.</th>
-              <th>時刻</th>
-              <th>返金枚数</th>
-              <th>払出金額</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody id="refundTableBody"></tbody>
-        </table>
+      <div class="table-scroll-wrapper">
+        <div class="table-scroll-container" id="refundTableContainer">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>返金No.</th>
+                <th>時刻</th>
+                <th>返金枚数</th>
+                <th>払出金額</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="refundTableBody"></tbody>
+          </table>
+        </div>
+        <div class="quick-scrollbar-rail" id="refundScrollRail">
+          <div class="quick-scrollbar-thumb" id="refundScrollThumb"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -405,7 +420,7 @@
       <div class="header-clock live-clock">--:--:--</div>
     </header>
 
-    <div class="settings-scroll-container">
+    <div class="settings-scroll-container" id="settingsContainer">
       <div class="settings-card">
         <div class="card-head-between">
           <h3 class="settings-card-title">開催日設定・開始</h3>
@@ -494,7 +509,6 @@
       </div>
 
       <div class="t-account-container">
-        <!-- 左側：受入 -->
         <div class="t-side left-side">
           <div class="t-side-header">【 受 入 (受取・元入) 】</div>
 
@@ -528,7 +542,6 @@
 
         <div class="t-divider"></div>
 
-        <!-- 右側：払出 -->
         <div class="t-side right-side">
           <div class="t-side-header">【 払 出 (支払・釣銭) 】</div>
 
@@ -671,6 +684,7 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <!-- キャッシュ強制破棄バージョン付き -->
+  <script src="script.js?v=3"></script>
 </body>
 </html>

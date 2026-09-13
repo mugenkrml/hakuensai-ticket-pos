@@ -1632,7 +1632,7 @@ html, body {
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
-  min-height: 0; /* ★iPad Flexbox必須設定 */
+  min-height: 0;
 }
 
 .screen-view.active {
@@ -1648,7 +1648,7 @@ html, body {
   align-items: center;
   padding: 6px 4px 8px 4px;
   border-bottom: 1px solid #e2e8f0;
-  flex-shrink: 0; /* ヘッダーが潰れないように固定 */
+  flex-shrink: 0;
 }
 
 .header-left {
@@ -1940,21 +1940,23 @@ html, body {
   border-color: #0f172a;
 }
 
-/* ★タブコンテンツのFlex最小高さ指定 */
 .manage-tab-content {
   display: none;
   flex: 1;
   flex-direction: column;
-  min-height: 0; /* ★iPadでスクロールさせる最重要プロパティ */
+  min-height: 0;
+  position: relative;
 }
 .manage-tab-content.active { display: flex; }
 
-/* 総合サマリー（縦スクロール対応） */
+/* 総合サマリー */
 #tabContentSummary {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  padding-bottom: 20px;
+  user-select: auto;
+  -webkit-user-select: auto;
+  padding-bottom: 24px;
 }
 
 .history-stat-grid {
@@ -2041,19 +2043,87 @@ html, body {
 .trash-badge { background: #ef4444; color: #ffffff; font-size: 0.7rem; padding: 1px 6px; border-radius: 10px; }
 .tab-btn.active .trash-badge { background: #ffffff; color: #ef4444; }
 
-/* ★iPadでテーブルが確実にスルスル動くスクロールコンテナ */
+/* ── スクロール領域 ＆ 右端太スクロールバー ── */
+.table-scroll-wrapper {
+  flex: 1;
+  display: flex;
+  position: relative;
+  min-height: 0;
+  width: 100%;
+}
+
 .table-scroll-container {
   flex: 1;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  overflow-y: auto;
+  overflow-y: scroll !important;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch; /* iOS/iPadOS 必須慣性スクロール */
-  touch-action: pan-y;               /* 縦スクロールを優先認識 */
-  min-height: 0;                     /* ★これが無いとiPadで高さ計算がバグります */
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  user-select: auto !important;
+  -webkit-user-select: auto !important;
+  min-height: 0;
   height: 100%;
 }
+
+/* ★iPad・WebKit用：常時表示される太く掴みやすいスクロールバー */
+.table-scroll-container::-webkit-scrollbar,
+.settings-scroll-container::-webkit-scrollbar,
+#tabContentSummary::-webkit-scrollbar {
+  width: 14px;
+}
+.table-scroll-container::-webkit-scrollbar-track,
+.settings-scroll-container::-webkit-scrollbar-track,
+#tabContentSummary::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+.table-scroll-container::-webkit-scrollbar-thumb,
+.settings-scroll-container::-webkit-scrollbar-thumb,
+#tabContentSummary::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 8px;
+  border: 3px solid #f1f5f9;
+}
+.table-scroll-container::-webkit-scrollbar-thumb:active,
+.settings-scroll-container::-webkit-scrollbar-thumb:active,
+#tabContentSummary::-webkit-scrollbar-thumb:active {
+  background: #0066ff;
+}
+
+/* ★iPad専用：右端の専用クイックスクロールレール（指で触ると瞬時にスクロール） */
+.quick-scrollbar-rail {
+  width: 22px;
+  margin-left: 6px;
+  background: #e2e8f0;
+  border-radius: 12px;
+  position: relative;
+  touch-action: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+}
+.quick-scrollbar-thumb {
+  width: 100%;
+  height: 60px;
+  background: #0066ff;
+  border-radius: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-shadow: 0 2px 6px rgba(0, 102, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.quick-scrollbar-thumb::after {
+  content: "≡";
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -2076,14 +2146,16 @@ html, body {
 .btn-row-restore { background: #ecfdf5; border: 1px solid #10b981; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 700; color: #059669; cursor: pointer; }
 .btn-row-delete-refund { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 700; color: #dc2626; cursor: pointer; }
 
-/* ── レジ設定画面（縦スクロール安定化） ── */
+/* ── レジ設定画面 ── */
 .settings-scroll-container {
   flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
+  overflow-y: scroll !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  user-select: auto !important;
+  -webkit-user-select: auto !important;
   min-height: 0;
-  padding: 8px 2px 24px 2px;
+  padding: 8px 6px 24px 2px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -2192,7 +2264,7 @@ html, body {
 .settle-btn-sub { font-size: 0.85rem; font-weight: 600; color: #94a3b8; }
 .settle-btn-main { font-size: 1.3rem; font-weight: 900; letter-spacing: 1px; color: #38bdf8; margin-top: 4px; }
 
-/* ── T勘定 精算モーダル（iPadスクロール完全対応） ── */
+/* ── T勘定 精算モーダル ── */
 .settle-sheet-card {
   background: #ffffff;
   border-radius: 20px;
@@ -2200,9 +2272,9 @@ html, body {
   width: 95%;
   max-width: 760px;
   max-height: 94vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
+  overflow-y: scroll !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
 }
 
