@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>金券管理システム</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ==================== 1. メインメニュー画面 ==================== -->
+  <div id="screenMenu" class="screen-view active">
+    <header class="header">
+      <div class="header-left">
+        <h1 class="header-title">金券管理システム</h1>
+        <div class="status-badge status-online" id="statusBadgeMenu">
+          <span class="status-dot"></span>
+          <span class="status-text">オンライン</span>
+        </div>
+      </div>
+      <div class="header-clock live-clock">--:--:--</div>
+    </header>
+
+    <main class="menu-content">
+      <button class="btn btn-sale" onclick="openSaleScreen()">
+        <span class="btn-text-large">金券販売</span>
+        <span class="btn-subtext">購入受付</span>
+      </button>
+
+      <button class="btn btn-refund" onclick="onNavigate('refund')">
+        <span class="btn-text-medium">返金処理</span>
+      </button>
+
+      <div class="sub-actions">
+        <button class="btn btn-sub" onclick="openManageScreen()">集計・管理</button>
+        <button class="btn btn-sub" onclick="onNavigate('settings')">レジ設定</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== 2. 金券販売（枚数入力）画面 ==================== -->
+  <div id="screenSale" class="screen-view">
+    <header class="header">
+      <div class="header-left">
+        <button class="btn-back" onclick="closeSaleScreen()">戻る</button>
+        <div class="status-badge status-online" id="statusBadgeSale">
+          <span class="status-dot"></span>
+          <span class="status-text">オンライン</span>
+        </div>
+      </div>
+      <div class="header-clock live-clock">--:--:--</div>
+    </header>
+
+    <div class="display-container" onclick="collapseTray('saleKeypadTray')">
+      <div class="display-row" id="rowSheetCount">
+        <span class="display-label">購入枚数</span>
+        <div class="display-value-wrap">
+          <span class="display-val" id="sheetCount">0</span>
+          <span class="display-unit">枚</span>
+        </div>
+      </div>
+
+      <div class="display-row display-total-row" id="totalAmountRow">
+        <span class="display-label total-label">請求金額</span>
+        <div class="display-value-wrap">
+          <span class="display-val total-val" id="totalPrice">0</span>
+          <span class="display-unit total-unit">円</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="keypad-tray slide-up" id="saleKeypadTray">
+      <div class="tray-handle" onclick="toggleTray('saleKeypadTray')">
+        <div class="handle-bar"></div>
+      </div>
+
+      <div class="keypad-layout">
+        <div class="keypad-grid">
+          <button class="key-btn" onclick="inputNumSale('1')">1</button>
+          <button class="key-btn" onclick="inputNumSale('2')">2</button>
+          <button class="key-btn" onclick="inputNumSale('3')">3</button>
+          <button class="key-btn" onclick="inputNumSale('4')">4</button>
+          <button class="key-btn" onclick="inputNumSale('5')">5</button>
+          <button class="key-btn" onclick="inputNumSale('6')">6</button>
+          <button class="key-btn" onclick="inputNumSale('7')">7</button>
+          <button class="key-btn" onclick="inputNumSale('8')">8</button>
+          <button class="key-btn" onclick="inputNumSale('9')">9</button>
+          <button class="key-btn key-clear" onclick="clearInputSale()">C</button>
+          <button class="key-btn" onclick="inputNumSale('0')">0</button>
+          <button class="key-btn key-bs" onclick="backspaceSale()">⌫</button>
+        </div>
+
+        <div class="confirm-column">
+          <button class="btn-action-flow" id="btnSaleAction" onclick="handleSaleAction()">
+            <span id="btnSaleActionText">確定</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 3. 会計・お釣り計算画面 ==================== -->
+  <div id="screenCheckout" class="screen-view">
+    <header class="header">
+      <button class="btn-back" onclick="backToSale()">枚数再入力</button>
+      <div class="header-clock live-clock">--:--:--</div>
+    </header>
+
+    <div class="display-container" onclick="collapseTray('checkoutKeypadTray')">
+      <div class="display-row display-input-row active" id="rowReceived">
+        <span class="display-label">受領金額</span>
+        <div class="display-value-wrap">
+          <span class="display-val highlight-val" id="receivedPrice">0</span>
+          <span class="display-unit">円</span>
+        </div>
+      </div>
+
+      <div class="display-row">
+        <span class="display-label">請求金額</span>
+        <div class="display-value-wrap">
+          <span class="display-val muted-val" id="checkoutBillingPrice">0</span>
+          <span class="display-unit">円</span>
+        </div>
+      </div>
+
+      <div class="display-row display-change-row" id="rowChange">
+        <span class="display-label change-label">お釣り</span>
+        <div class="display-value-wrap">
+          <span class="display-val change-val" id="changePrice">0</span>
+          <span class="display-unit change-unit">円</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="keypad-tray slide-up" id="checkoutKeypadTray">
+      <div class="tray-handle" onclick="toggleTray('checkoutKeypadTray')">
+        <div class="handle-bar"></div>
+      </div>
+
+      <div class="keypad-layout">
+        <div class="keypad-grid">
+          <button class="key-btn" onclick="inputNumPay('1')">1</button>
+          <button class="key-btn" onclick="inputNumPay('2')">2</button>
+          <button class="key-btn" onclick="inputNumPay('3')">3</button>
+          <button class="key-btn" onclick="inputNumPay('4')">4</button>
+          <button class="key-btn" onclick="inputNumPay('5')">5</button>
+          <button class="key-btn" onclick="inputNumPay('6')">6</button>
+          <button class="key-btn" onclick="inputNumPay('7')">7</button>
+          <button class="key-btn" onclick="inputNumPay('8')">8</button>
+          <button class="key-btn" onclick="inputNumPay('9')">9</button>
+          <button class="key-btn key-clear" onclick="clearInputPay()">C</button>
+          <button class="key-btn" onclick="inputNumPay('0')">0</button>
+          <button class="key-btn key-bs" onclick="backspacePay()">⌫</button>
+        </div>
+
+        <div class="confirm-column">
+          <button class="btn-action-flow" id="btnPayAction" onclick="handlePayAction()">
+            <span id="btnPayActionText">確定</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 4. 集計・管理画面 ==================== -->
+  <div id="screenManage" class="screen-view">
+    <header class="header">
+      <div class="header-left">
+        <button class="btn-back" onclick="closeManageScreen()">メニューへ戻る</button>
+        <span class="manage-title">売上集計・履歴管理</span>
+        <div class="status-badge status-online" id="statusBadgeManage">
+          <span class="status-dot"></span>
+          <span class="status-text">オンライン</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn-sync" onclick="fetchFromGAS(true)" id="btnSync">スプシ再読込</button>
+        <div class="header-clock live-clock">--:--:--</div>
+      </div>
+    </header>
+
+    <div class="manage-summary-grid">
+      <div class="summary-card">
+        <span class="card-label">合計販売枚数</span>
+        <div class="card-val-wrap">
+          <span class="card-val" id="summaryTotalSheets">0</span>
+          <span class="card-unit">枚</span>
+        </div>
+      </div>
+      <div class="summary-card primary-card">
+        <span class="card-label">総合売上金額</span>
+        <div class="card-val-wrap">
+          <span class="card-val" id="summaryTotalSales">0</span>
+          <span class="card-unit">円</span>
+        </div>
+      </div>
+      <div class="summary-card">
+        <span class="card-label">有効取引件数</span>
+        <div class="card-val-wrap">
+          <span class="card-val" id="summaryTotalOrders">0</span>
+          <span class="card-unit">件</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 履歴／ゴミ箱 タブバー -->
+    <div class="manage-tab-bar">
+      <div class="tab-group">
+        <button class="tab-btn active" id="tabActive" onclick="switchManageTab('active')">販売履歴</button>
+        <button class="tab-btn" id="tabTrash" onclick="switchManageTab('trash')">
+          削除履歴（ゴミ箱） <span class="trash-badge" id="trashCountBadge">0</span>
+        </button>
+      </div>
+
+      <div class="table-action-bar" id="activeActionBar">
+        <span class="selection-status">選択: <strong id="selectedCountText">0</strong>件</span>
+        <button class="btn-bulk-delete" id="btnBulkDelete" onclick="deleteSelectedRows()" disabled>
+          選択したデータを削除
+        </button>
+      </div>
+    </div>
+
+    <div class="table-scroll-container">
+      <table class="data-table">
+        <thead>
+          <tr id="tableHeaderRow"></tr>
+        </thead>
+        <tbody id="dataTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ==================== 5. 編集モーダル ==================== -->
+  <div class="modal-backdrop" id="editModal">
+    <div class="edit-card">
+      <h3 class="edit-title">取引データの変更 (No.<span id="editNoText"></span>)</h3>
+      <div class="edit-field">
+        <label>販売枚数</label>
+        <input type="number" id="editSheets" min="1" oninput="recalcEdit()">
+      </div>
+      <div class="edit-field">
+        <label>受領金額 (円)</label>
+        <input type="number" id="editReceived" min="0" oninput="recalcEdit()">
+      </div>
+      <div class="edit-field">
+        <label>計算されたお釣り</label>
+        <div class="edit-calc-val" id="editChange">0 円</div>
+      </div>
+      <div class="edit-actions">
+        <button class="btn-cancel" onclick="closeEditModal()">キャンセル</button>
+        <button class="btn-save" onclick="saveEditRow()">変更を保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 6. 完了モーダル ==================== -->
+  <div class="modal-backdrop" id="completionModal">
+    <div class="success-card">
+      <div class="svg-check-wrapper">
+        <svg class="checkmark-svg" viewBox="0 0 52 52">
+          <circle class="checkmark-circle" cx="26" cy="26" r="24" fill="none"/>
+          <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+      </div>
+      <h2 class="modal-title">販売完了</h2>
+      <p class="modal-subtitle" id="modalSummary">0枚 0円</p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
