@@ -1620,6 +1620,7 @@ html, body {
   line-height: 1.4;
 }
 
+/* 画面共通ラッパー */
 .screen-view {
   display: none;
   width: 100%;
@@ -1631,6 +1632,7 @@ html, body {
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
+  min-height: 0; /* ★iPad Flexbox必須設定 */
 }
 
 .screen-view.active {
@@ -1646,6 +1648,7 @@ html, body {
   align-items: center;
   padding: 6px 4px 8px 4px;
   border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0; /* ヘッダーが潰れないように固定 */
 }
 
 .header-left {
@@ -1747,6 +1750,7 @@ html, body {
   flex-direction: column;
   gap: 12px;
   margin-top: 12px;
+  min-height: 0;
 }
 
 .btn {
@@ -1800,6 +1804,7 @@ html, body {
   gap: 10px;
   padding: 6px 2px;
   cursor: pointer;
+  min-height: 0;
 }
 
 .display-row {
@@ -1838,7 +1843,6 @@ html, body {
 .display-change-row.active .change-val,
 .display-change-row.active .change-unit { color: #059669; }
 
-/* 返金専用スタイル */
 .refund-label-wrap { display: flex; flex-direction: column; }
 .refund-sub-guide { font-size: 0.8rem; font-weight: 700; color: #dc2626; margin-top: 2px; }
 .text-refund { color: #dc2626 !important; }
@@ -1858,6 +1862,7 @@ html, body {
   position: relative;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   touch-action: pan-y;
+  flex-shrink: 0;
 }
 .keypad-tray.tray-collapsed { transform: translateY(calc(100% - 28px)); }
 .tray-handle { width: 100%; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -1917,6 +1922,7 @@ html, body {
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
   margin: 10px 0 10px 0;
+  flex-shrink: 0;
 }
 .manage-nav-btn {
   background: #ffffff;
@@ -1934,15 +1940,29 @@ html, body {
   border-color: #0f172a;
 }
 
-.manage-tab-content { display: none; flex: 1; flex-direction: column; }
+/* ★タブコンテンツのFlex最小高さ指定 */
+.manage-tab-content {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0; /* ★iPadでスクロールさせる最重要プロパティ */
+}
 .manage-tab-content.active { display: flex; }
 
-/* 復活・新設されたトップ見出しピルカード */
+/* 総合サマリー（縦スクロール対応） */
+#tabContentSummary {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding-bottom: 20px;
+}
+
 .history-stat-grid {
   display: grid;
   grid-template-columns: 1fr 1.3fr 1fr;
   gap: 10px;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .stat-pill-card {
   background: #ffffff;
@@ -1959,7 +1979,6 @@ html, body {
 .danger-pill { background: #fef2f2; border-color: #fecaca; }
 .danger-pill .stat-pill-val { color: #dc2626; }
 
-/* 総合サマリー */
 .summary-hero-card {
   background: linear-gradient(135deg, #0066ff, #004ecc);
   border-radius: 18px;
@@ -1969,13 +1988,19 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 0;
 }
 .hero-label { font-size: 0.95rem; font-weight: 700; color: #bfdbfe; }
 .hero-val-wrap { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
 .hero-val { font-size: clamp(2.4rem, 6vw, 3.6rem); font-weight: 900; }
 .hero-unit { font-size: 1.2rem; font-weight: 700; color: #bfdbfe; }
 
-.summary-breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.summary-breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex-shrink: 0;
+}
 .breakdown-card {
   background: #ffffff;
   border-radius: 14px;
@@ -1991,7 +2016,13 @@ html, body {
 .breakdown-row { display: flex; justify-content: space-between; font-size: 0.9rem; color: #475569; }
 .breakdown-row strong { color: #0f172a; font-size: 1rem; }
 
-.manage-tab-bar { display: flex; justify-content: space-between; align-items: center; padding: 4px 0 6px 0; }
+.manage-tab-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 6px 0;
+  flex-shrink: 0;
+}
 .tab-group { display: flex; gap: 6px; }
 .tab-btn {
   background: #e2e8f0;
@@ -2010,16 +2041,34 @@ html, body {
 .trash-badge { background: #ef4444; color: #ffffff; font-size: 0.7rem; padding: 1px 6px; border-radius: 10px; }
 .tab-btn.active .trash-badge { background: #ffffff; color: #ef4444; }
 
+/* ★iPadでテーブルが確実にスルスル動くスクロールコンテナ */
 .table-scroll-container {
   flex: 1;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* iOS/iPadOS 必須慣性スクロール */
+  touch-action: pan-y;               /* 縦スクロールを優先認識 */
+  min-height: 0;                     /* ★これが無いとiPadで高さ計算がバグります */
+  height: 100%;
 }
-.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
 .data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
-.data-table th { background: #f8fafc; color: #475569; font-weight: 700; position: sticky; top: 0; z-index: 2; }
+.data-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
 .th-chk { width: 40px; text-align: center; }
 .td-chk { text-align: center; }
 
@@ -2027,10 +2076,13 @@ html, body {
 .btn-row-restore { background: #ecfdf5; border: 1px solid #10b981; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 700; color: #059669; cursor: pointer; }
 .btn-row-delete-refund { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 700; color: #dc2626; cursor: pointer; }
 
-/* ── レジ設定画面 ── */
+/* ── レジ設定画面（縦スクロール安定化） ── */
 .settings-scroll-container {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  min-height: 0;
   padding: 8px 2px 24px 2px;
   display: flex;
   flex-direction: column;
@@ -2041,6 +2093,7 @@ html, body {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 16px 18px;
+  flex-shrink: 0;
 }
 .card-head-between {
   display: flex;
@@ -2122,7 +2175,7 @@ html, body {
 }
 
 /* 巨大 日次精算起動ボタン */
-.settlement-launch-section { margin-top: 6px; }
+.settlement-launch-section { margin-top: 6px; flex-shrink: 0; }
 .btn-launch-settlement {
   background: linear-gradient(135deg, #0f172a, #1e293b);
   border: 2px solid #38bdf8;
@@ -2139,7 +2192,7 @@ html, body {
 .settle-btn-sub { font-size: 0.85rem; font-weight: 600; color: #94a3b8; }
 .settle-btn-main { font-size: 1.3rem; font-weight: 900; letter-spacing: 1px; color: #38bdf8; margin-top: 4px; }
 
-/* ── T勘定 精算モーダル ── */
+/* ── T勘定 精算モーダル（iPadスクロール完全対応） ── */
 .settle-sheet-card {
   background: #ffffff;
   border-radius: 20px;
@@ -2148,6 +2201,8 @@ html, body {
   max-width: 760px;
   max-height: 94vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
 }
 
@@ -2207,7 +2262,6 @@ html, body {
 }
 .t-unit { font-size: 0.85rem; font-weight: 700; color: #64748b; }
 
-/* 筆算合計線バー */
 .t-totals-bar {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2222,7 +2276,6 @@ html, body {
 .t-subtotal-label { font-size: 0.9rem; font-weight: 800; color: #475569; }
 .t-subtotal-val { font-size: 1.25rem; font-weight: 900; color: #0f172a; }
 
-/* 残高突き合わせパネル */
 .settle-reconciliation-panel {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
