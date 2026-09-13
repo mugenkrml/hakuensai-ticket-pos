@@ -1,7 +1,18 @@
-// ★★★ ご自身のGASウェブアプリURL ★★★
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzvkpbYbCp_2grTdcpxu8m5IOXrTGLSFhdJTXP8Z3BXKHWBNDMMBh2rcUx6VQHHX4Nq5g/exec";
+// ★★★ Google Apps Script ウェブアプリURL ★★★
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbzvkpbYbCp_2grTdcpxu8m5IOXrTGLSFhdJTXP8Z3BXKHWBNDMMBh2rcUx6VQHHX4Nq5g/exec";
+let GAS_URL = localStorage.getItem("pos_gas_url") || DEFAULT_GAS_URL;
 
-const UNIT_PRICE = 500;
+// 管理者パスキー
+const ADMIN_PASSKEY = "1207";
+
+// 金券単価（設定可能）
+let UNIT_PRICE = Number(localStorage.getItem("pos_unit_price") || 500);
+
+// 音声設定（デフォルトON）
+let isSoundEnabled = localStorage.getItem("pos_sound_enabled") !== "false";
+
+// 開催日設定（デフォルト: 1日目）
+let currentDay = localStorage.getItem("pos_current_day") || "1";
 
 // 販売・会計の状態管理
 let saleCountStr = "0";
@@ -10,15 +21,72 @@ let payReceivedStr = "0";
 let currentTotalBilling = 0;
 let isPayConfirmed = false;
 
-// データ配列（販売データ / 削除履歴 / オフライン未送信キュー）
-let orderHistory = JSON.parse(localStorage.getItem("pos_sales_data") || "[]");
-let trashHistory = JSON.parse(localStorage.getItem("pos_trash_data") || "[]");
+// 返金の状態管理
+let refundCountStr = "0";
+let isRefundConfirmed = false;
+
+// データ配列（販売 / 返金 / 削除履歴 / オフライン未送信キュー）
+let orderHistory = JSON.parse(localStorage.getItem(`pos_sales_data_${currentDay}`) || "[]");
+let refundHistory = JSON.parse(localStorage.getItem(`pos_refund_data_${currentDay}`) || "[]");
+let trashHistory = JSON.parse(localStorage.getItem(`pos_trash_data_${currentDay}`) || "[]");
 let offlineQueue = JSON.parse(localStorage.getItem("pos_offline_queue") || "[]");
 
-let activeTab = "active";
+// 管理画面タブ状態
+let currentMainTab = "summary"; // "summary" | "sale" | "refund"
+let saleSubTab = "active";      // "active" | "trash"
 let editingOrderId = null;
 
-// ── 1. オンライン / オフライン状態監視 ＆ キュー自動同期 ──
+// パスキー入力状態
+let passkeyEntered = "";
+let passkeySuccessCallback = null;
+
+// ── 音声リソース ──
+const sounds = {
+  tap: new Audio("audio/tap.mp3"),
+  complete: new Audio("audio/complete.mp3"),
+  refund: new Audio("audio/refund.mp3"),
+  error: new Audio("audio/error.mp3")
+};
+
+function playSound(name) {
+  if (!isSoundEnabled) return;
+  if (sounds[name]) {
+    sounds[name].currentTime = 0;
+    sounds[name].play().catch(e => console.warn("音声再生制限:", e));
+  }
+}
+
+function toggleSound() {
+  isSoundEnabled = !isSoundEnabled;
+  localStorage.setItem("pos_sound_enabled", isSoundEnabled);
+  updateSoundUI();
+}
+
+function updateSoundUI() {
+  const btn = document.getElementById("btnSoundToggle");
+  const icon = document.getElementById("soundIcon");
+  const text = document.getElementById("soundText");
+  if (!btn) return;
+
+  if (isSoundEnabled) {
+    btn.classList.remove("muted");
+    icon.innerText = "🔊";
+    text.innerText = "音声 ON";
+  } else {
+    btn.classList.add("muted");
+    icon.innerText = "🔇";
+    text.innerText = "音声 OFF";
+  }
+}
+
+function updateDayUI() {
+  const dayText = `${currentDay}日目`;
+  document.querySelectorAll(".day-badge").forEach(el => {
+    el.innerText = dayText;
+  });
+}
+
+// ── 1. オンライン / オフライン監視 ＆ キュー自動同期 ──
 async function updateOnlineStatus() {
   const isOnline = navigator.onLine;
   const badges = document.querySelectorAll(".status-badge");
@@ -34,7 +102,6 @@ async function updateOnlineStatus() {
     }
   });
 
-  // オンライン復帰時は「未送信を送信」してから「スプシ最新化」
   if (isOnline && offlineQueue.length > 0) {
     await flushOfflineQueue();
     fetchFromGAS(false);
@@ -92,6 +159,7 @@ function setupSwipeDown(trayId) {
 }
 setupSwipeDown("saleKeypadTray");
 setupSwipeDown("checkoutKeypadTray");
+setupSwipeDown("refundKeypadTray");
 
 // ── 4. 金券販売（枚数入力） ──
 function openSaleScreen() {
@@ -108,18 +176,21 @@ function updateSaleDisplay() {
   document.getElementById("sheetCount").innerText = Number(saleCountStr).toLocaleString();
 }
 function inputNumSale(num) {
+  playSound("tap");
   if (isSaleConfirmed) resetSaleConfirmState();
   if (saleCountStr.length >= 3 && saleCountStr !== "0") return;
   saleCountStr = (saleCountStr === "0") ? String(num) : saleCountStr + String(num);
   updateSaleDisplay();
 }
 function clearInputSale() {
+  playSound("tap");
   saleCountStr = "0";
   updateSaleDisplay();
   resetSaleConfirmState();
   document.getElementById("totalPrice").innerText = "0";
 }
 function backspaceSale() {
+  playSound("tap");
   if (isSaleConfirmed) resetSaleConfirmState();
   saleCountStr = (saleCountStr.length <= 1) ? "0" : saleCountStr.slice(0, -1);
   updateSaleDisplay();
@@ -132,6 +203,7 @@ function resetSaleConfirmState() {
   document.getElementById("btnSaleActionText").innerText = "確定";
 }
 function handleSaleAction() {
+  playSound("tap");
   if (!isSaleConfirmed) {
     const count = Number(saleCountStr);
     if (count <= 0) { alert("枚数を入力してください"); return; }
@@ -170,18 +242,21 @@ function updatePayDisplay() {
   document.getElementById("receivedPrice").innerText = Number(payReceivedStr).toLocaleString();
 }
 function inputNumPay(num) {
+  playSound("tap");
   if (isPayConfirmed) resetPayConfirmState();
   if (payReceivedStr.length >= 7 && payReceivedStr !== "0") return;
   payReceivedStr = (payReceivedStr === "0") ? String(num) : payReceivedStr + String(num);
   updatePayDisplay();
 }
 function clearInputPay() {
+  playSound("tap");
   payReceivedStr = "0";
   updatePayDisplay();
   resetPayConfirmState();
   document.getElementById("changePrice").innerText = "0";
 }
 function backspacePay() {
+  playSound("tap");
   if (isPayConfirmed) resetPayConfirmState();
   payReceivedStr = (payReceivedStr.length <= 1) ? "0" : payReceivedStr.slice(0, -1);
   updatePayDisplay();
@@ -195,6 +270,7 @@ function resetPayConfirmState() {
 }
 function handlePayAction() {
   if (!isPayConfirmed) {
+    playSound("tap");
     const received = Number(payReceivedStr);
     if (received < currentTotalBilling) { alert("受領金額が請求金額を下回っています"); return; }
     const change = received - currentTotalBilling;
@@ -210,20 +286,19 @@ function handlePayAction() {
   }
 }
 
-// ── 6. 単一連番（1, 2, 3...）の自動採番 ──
+// ── 6. 販売確定・保存 ──
 function getNextOrderNo() {
   const allOrders = [...orderHistory, ...trashHistory];
   let maxNo = 0;
   allOrders.forEach(o => {
     const num = parseInt(o.no, 10);
-    if (!isNaN(num) && num > maxNo) {
-      maxNo = num;
-    }
+    if (!isNaN(num) && num > maxNo) maxNo = num;
   });
   return maxNo + 1;
 }
 
 function completeOrder() {
+  playSound("complete");
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
   const sheets = Number(saleCountStr);
@@ -232,41 +307,145 @@ function completeOrder() {
 
   const orderItem = {
     id: "ord_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
-    no: getNextOrderNo(), // 固有連番
+    no: getNextOrderNo(),
     time: timeStr,
     sheetCount: sheets,
     received: received,
-    change: change
+    change: change,
+    day: currentDay
   };
 
   orderHistory.push(orderItem);
-  localStorage.setItem("pos_sales_data", JSON.stringify(orderHistory));
+  saveCurrentDayStorage();
 
   enqueueOrSend("create", { data: orderItem });
-  showSuccessModal(sheets, currentTotalBilling);
+  showSuccessModal("販売完了", `${sheets}枚  ${currentTotalBilling.toLocaleString()}円`, false);
 }
 
-function showSuccessModal(sheets, total) {
+// ── 7. 返金処理画面ロジック ──
+function openRefundScreen() {
+  document.getElementById("screenMenu").classList.remove("active");
+  document.getElementById("screenRefund").classList.add("active");
+  clearInputRefund();
+  document.getElementById("refundKeypadTray").classList.remove("tray-collapsed");
+}
+function closeRefundScreen() {
+  document.getElementById("screenRefund").classList.remove("active");
+  document.getElementById("screenMenu").classList.add("active");
+}
+function updateRefundDisplay() {
+  document.getElementById("refundSheetCount").innerText = Number(refundCountStr).toLocaleString();
+}
+function inputNumRefund(num) {
+  playSound("tap");
+  if (isRefundConfirmed) resetRefundConfirmState();
+  if (refundCountStr.length >= 3 && refundCountStr !== "0") return;
+  refundCountStr = (refundCountStr === "0") ? String(num) : refundCountStr + String(num);
+  updateRefundDisplay();
+}
+function clearInputRefund() {
+  playSound("tap");
+  refundCountStr = "0";
+  updateRefundDisplay();
+  resetRefundConfirmState();
+  document.getElementById("refundTotalPrice").innerText = "0";
+}
+function backspaceRefund() {
+  playSound("tap");
+  if (isRefundConfirmed) resetRefundConfirmState();
+  refundCountStr = (refundCountStr.length <= 1) ? "0" : refundCountStr.slice(0, -1);
+  updateRefundDisplay();
+}
+function resetRefundConfirmState() {
+  isRefundConfirmed = false;
+  document.getElementById("refundAmountRow").classList.remove("active");
+  const btn = document.getElementById("btnRefundAction");
+  btn.classList.remove("mode-refund-confirm");
+  document.getElementById("btnRefundActionText").innerText = "確定";
+}
+function handleRefundAction() {
+  playSound("tap");
+  if (!isRefundConfirmed) {
+    const count = Number(refundCountStr);
+    if (count <= 0) { alert("返金枚数を入力してください"); return; }
+    const totalRefund = count * UNIT_PRICE;
+    document.getElementById("refundTotalPrice").innerText = `-${totalRefund.toLocaleString()}`;
+    document.getElementById("refundAmountRow").classList.add("active");
+
+    isRefundConfirmed = true;
+    const btn = document.getElementById("btnRefundAction");
+    btn.classList.add("mode-refund-confirm");
+    document.getElementById("btnRefundActionText").innerText = "返金を確定";
+  } else {
+    completeRefund();
+  }
+}
+
+function getNextRefundNo() {
+  let maxNo = 0;
+  refundHistory.forEach(r => {
+    const num = parseInt(r.no, 10);
+    if (!isNaN(num) && num > maxNo) maxNo = num;
+  });
+  return maxNo + 1;
+}
+
+function completeRefund() {
+  playSound("refund");
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  const sheets = Number(refundCountStr);
+  const refundAmount = sheets * UNIT_PRICE;
+
+  const refundItem = {
+    id: "ref_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+    no: getNextRefundNo(),
+    time: timeStr,
+    sheetCount: sheets,
+    amount: refundAmount,
+    day: currentDay
+  };
+
+  refundHistory.push(refundItem);
+  saveCurrentDayStorage();
+
+  enqueueOrSend("create_refund", { data: refundItem });
+  showSuccessModal("返金完了", `${sheets}枚  -${refundAmount.toLocaleString()}円`, true);
+}
+
+// ── 8. 完了モーダル表示 ──
+function showSuccessModal(title, subtitle, isRefund) {
   const modal = document.getElementById("completionModal");
-  document.getElementById("modalSummary").innerText = `${sheets}枚  ${total.toLocaleString()}円`;
+  const card = document.getElementById("successCard");
+  document.getElementById("modalTitle").innerText = title;
+  document.getElementById("modalSummary").innerText = subtitle;
+
+  if (isRefund) {
+    card.classList.add("refund-card-theme");
+  } else {
+    card.classList.remove("refund-card-theme");
+  }
+
   modal.classList.add("show");
 
   setTimeout(() => {
     modal.classList.remove("show");
     document.getElementById("screenCheckout").classList.remove("active");
     document.getElementById("screenSale").classList.remove("active");
+    document.getElementById("screenRefund").classList.remove("active");
     document.getElementById("screenMenu").classList.add("active");
     clearInputSale();
     clearInputPay();
+    clearInputRefund();
   }, 1600);
 }
 
-// ── 7. 集計・管理画面 ──
+// ── 9. 集計・管理画面（3タブ制御） ──
 function openManageScreen() {
   document.getElementById("screenMenu").classList.remove("active");
   document.getElementById("screenManage").classList.add("active");
 
-  renderManageTable();
+  renderAllManageViews();
   if (navigator.onLine) fetchFromGAS(false);
 }
 function closeManageScreen() {
@@ -274,31 +453,68 @@ function closeManageScreen() {
   document.getElementById("screenMenu").classList.add("active");
 }
 
-function switchManageTab(tab) {
-  activeTab = tab;
-  document.getElementById("tabActive").classList.toggle("active", tab === "active");
-  document.getElementById("tabTrash").classList.toggle("active", tab === "trash");
-  document.getElementById("activeActionBar").style.display = (tab === "active") ? "flex" : "none";
-  renderManageTable();
+function switchMainTab(tab) {
+  currentMainTab = tab;
+  document.getElementById("tabNavSummary").classList.toggle("active", tab === "summary");
+  document.getElementById("tabNavSale").classList.toggle("active", tab === "sale");
+  document.getElementById("tabNavRefund").classList.toggle("active", tab === "refund");
+
+  document.getElementById("tabContentSummary").classList.toggle("active", tab === "summary");
+  document.getElementById("tabContentSale").classList.toggle("active", tab === "sale");
+  document.getElementById("tabContentRefund").classList.toggle("active", tab === "refund");
+
+  renderAllManageViews();
 }
 
-function renderManageTable() {
+function switchSaleSubTab(sub) {
+  saleSubTab = sub;
+  document.getElementById("subTabActive").classList.toggle("active", sub === "active");
+  document.getElementById("subTabTrash").classList.toggle("active", sub === "trash");
+  document.getElementById("activeActionBar").style.display = (sub === "active") ? "flex" : "none";
+  renderSaleTable();
+}
+
+function renderAllManageViews() {
+  // 1. サマリー計算
+  let totalSaleSheets = 0;
+  let totalSaleAmount = 0;
+  orderHistory.forEach(item => {
+    totalSaleSheets += item.sheetCount;
+    totalSaleAmount += (item.sheetCount * UNIT_PRICE);
+  });
+
+  let totalRefundSheets = 0;
+  let totalRefundAmount = 0;
+  refundHistory.forEach(item => {
+    totalRefundSheets += item.sheetCount;
+    totalRefundAmount += item.amount;
+  });
+
+  const netSales = totalSaleAmount - totalRefundAmount;
+
+  document.getElementById("sumNetSales").innerText = netSales.toLocaleString();
+  document.getElementById("sumSaleSheets").innerText = totalSaleSheets.toLocaleString();
+  document.getElementById("sumSaleAmount").innerText = totalSaleAmount.toLocaleString();
+  document.getElementById("sumSaleOrders").innerText = orderHistory.length.toLocaleString();
+
+  document.getElementById("sumRefundSheets").innerText = totalRefundSheets.toLocaleString();
+  document.getElementById("sumRefundAmount").innerText = totalRefundAmount.toLocaleString();
+  document.getElementById("sumRefundOrders").innerText = refundHistory.length.toLocaleString();
+
+  document.getElementById("trashCountBadge").innerText = trashHistory.length;
+  document.getElementById("refundTotalCountText").innerText = refundHistory.length.toLocaleString();
+
+  // 2. テーブル描画
+  renderSaleTable();
+  renderRefundTable();
+}
+
+function renderSaleTable() {
   const theadRow = document.getElementById("tableHeaderRow");
   const tbody = document.getElementById("dataTableBody");
   tbody.innerHTML = "";
 
-  let totalSheets = 0;
-  let totalSales = 0;
-  orderHistory.forEach(item => {
-    totalSheets += item.sheetCount;
-    totalSales += (item.sheetCount * UNIT_PRICE);
-  });
-  document.getElementById("summaryTotalSheets").innerText = totalSheets.toLocaleString();
-  document.getElementById("summaryTotalSales").innerText = totalSales.toLocaleString();
-  document.getElementById("summaryTotalOrders").innerText = orderHistory.length.toLocaleString();
-  document.getElementById("trashCountBadge").innerText = trashHistory.length;
-
-  if (activeTab === "active") {
+  if (saleSubTab === "active") {
     theadRow.innerHTML = `
       <th class="th-chk"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this)"></th>
       <th>No.</th>
@@ -356,6 +572,28 @@ function renderManageTable() {
   }
 }
 
+function renderRefundTable() {
+  const tbody = document.getElementById("refundTableBody");
+  tbody.innerHTML = "";
+
+  if (refundHistory.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:24px;">返金データはありません</td></tr>`;
+    return;
+  }
+
+  refundHistory.forEach(item => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong style="color:#dc2626;">R-${item.no}</strong></td>
+      <td>${item.time}</td>
+      <td><strong>${item.sheetCount}</strong> 枚</td>
+      <td style="color:#dc2626; font-weight:bold;">-${item.amount.toLocaleString()} 円</td>
+      <td><button class="btn-row-delete-refund" onclick="deleteRefundRow('${item.id}')">削除</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 function toggleSelectAll(master) {
   document.querySelectorAll(".row-chk").forEach(chk => chk.checked = master.checked);
   onRowCheckChange();
@@ -367,8 +605,8 @@ function onRowCheckChange() {
   document.getElementById("btnBulkDelete").disabled = (count === 0);
 }
 
-// ── 8. 一括削除 ──
-function deleteSelectedRows() {
+// ── 10. 販売データ削除・復元 ──
+async function deleteSelectedRows() {
   const selectedIds = Array.from(document.querySelectorAll(".row-chk:checked")).map(el => el.value);
   if (selectedIds.length === 0) return;
 
@@ -383,14 +621,21 @@ function deleteSelectedRows() {
   trashHistory.push(...deletedItems);
   orderHistory = orderHistory.filter(item => !selectedIds.includes(item.id));
 
-  localStorage.setItem("pos_sales_data", JSON.stringify(orderHistory));
-  localStorage.setItem("pos_trash_data", JSON.stringify(trashHistory));
+  saveCurrentDayStorage();
+  renderAllManageViews();
 
-  enqueueOrSend("delete", { ids: selectedIds });
-  renderManageTable();
+  if (navigator.onLine) {
+    try {
+      await sendPostToGAS("delete", { ids: selectedIds });
+      fetchFromGAS(false);
+    } catch (e) {
+      enqueueOrSend("delete", { ids: selectedIds });
+    }
+  } else {
+    enqueueOrSend("delete", { ids: selectedIds });
+  }
 }
 
-// ── 9. 復元（差し戻し ＆ スプシ同期保証） ──
 async function restoreRow(id) {
   const itemIndex = trashHistory.findIndex(item => item.id === id);
   if (itemIndex === -1) return;
@@ -398,24 +643,19 @@ async function restoreRow(id) {
   const item = trashHistory[itemIndex];
   trashHistory.splice(itemIndex, 1);
 
-  // 数値順（No.1, No.2, No.3...）で綺麗に差し戻す
   orderHistory.push(item);
   orderHistory.sort((a, b) => Number(a.no) - Number(b.no));
 
-  localStorage.setItem("pos_sales_data", JSON.stringify(orderHistory));
-  localStorage.setItem("pos_trash_data", JSON.stringify(trashHistory));
+  saveCurrentDayStorage();
+  renderAllManageViews();
 
-  renderManageTable();
-
-  // スプシへ復元リクエストを送り、確実に完了を待つ
   if (!navigator.onLine) {
     enqueueOrSend("restore", { id: id });
   } else {
     try {
       await sendPostToGAS("restore", { id: id });
-      console.log("スプシ側で復元＆ソート完了");
+      fetchFromGAS(false);
     } catch (err) {
-      console.warn("復元送信失敗、キューに保持:", err);
       enqueueOrSend("restore", { id: id });
     }
   }
@@ -423,7 +663,27 @@ async function restoreRow(id) {
   alert(`No.${item.no} のデータを元の位置に復元しました！`);
 }
 
-// ── 10. 編集モーダル ──
+// 返金データの削除
+async function deleteRefundRow(id) {
+  if (!confirm("この返金記録を削除しますか？\n（スプレッドシートからも行が削除されます）")) return;
+
+  refundHistory = refundHistory.filter(r => r.id !== id);
+  saveCurrentDayStorage();
+  renderAllManageViews();
+
+  if (navigator.onLine) {
+    try {
+      await sendPostToGAS("delete_refund", { ids: [id] });
+      fetchFromGAS(false);
+    } catch (e) {
+      enqueueOrSend("delete_refund", { ids: [id] });
+    }
+  } else {
+    enqueueOrSend("delete_refund", { ids: [id] });
+  }
+}
+
+// ── 11. 販売編集モーダル ──
 function openEditModal(id) {
   const item = orderHistory.find(o => o.id === id);
   if (!item) return;
@@ -445,7 +705,7 @@ function recalcEdit() {
   const change = received - (sheets * UNIT_PRICE);
   document.getElementById("editChange").innerText = `${change.toLocaleString()} 円`;
 }
-function saveEditRow() {
+async function saveEditRow() {
   const sheets = Number(document.getElementById("editSheets").value);
   const received = Number(document.getElementById("editReceived").value);
   if (sheets <= 0) { alert("枚数は1枚以上にしてください"); return; }
@@ -457,14 +717,166 @@ function saveEditRow() {
     orderHistory[index].received = received;
     orderHistory[index].change = received - (sheets * UNIT_PRICE);
 
-    localStorage.setItem("pos_sales_data", JSON.stringify(orderHistory));
-    enqueueOrSend("update", { data: orderHistory[index] });
-    renderManageTable();
+    saveCurrentDayStorage();
+
+    if (navigator.onLine) {
+      try {
+        await sendPostToGAS("update", { data: orderHistory[index] });
+        fetchFromGAS(false);
+      } catch (e) {
+        enqueueOrSend("update", { data: orderHistory[index] });
+      }
+    } else {
+      enqueueOrSend("update", { data: orderHistory[index] });
+    }
+
+    renderAllManageViews();
     closeEditModal();
   }
 }
 
-// ── 11. オフラインキュー ＆ 通信処理 ──
+// ── 12. レジ設定画面 ──
+function openSettingsScreen() {
+  document.getElementById("screenMenu").classList.remove("active");
+  document.getElementById("screenSettings").classList.add("active");
+
+  document.getElementById("settingUnitPrice").value = UNIT_PRICE;
+  document.getElementById("settingGasUrl").value = GAS_URL;
+  updateSettingsDayButtons();
+}
+function closeSettingsScreen() {
+  document.getElementById("screenSettings").classList.remove("active");
+  document.getElementById("screenMenu").classList.add("active");
+}
+function updateSettingsDayButtons() {
+  document.getElementById("btnDay1").classList.toggle("active", currentDay === "1");
+  document.getElementById("btnDay2").classList.toggle("active", currentDay === "2");
+}
+
+function setDay(day) {
+  if (currentDay === day) return;
+  currentDay = day;
+  localStorage.setItem("pos_current_day", currentDay);
+
+  orderHistory = JSON.parse(localStorage.getItem(`pos_sales_data_${currentDay}`) || "[]");
+  refundHistory = JSON.parse(localStorage.getItem(`pos_refund_data_${currentDay}`) || "[]");
+  trashHistory = JSON.parse(localStorage.getItem(`pos_trash_data_${currentDay}`) || "[]");
+
+  updateDayUI();
+  updateSettingsDayButtons();
+
+  if (navigator.onLine) fetchFromGAS(false);
+
+  alert(`「${currentDay}日目」に切り替えました。\n（スプシ参照先: 販売データ${currentDay} / 返金データ${currentDay}）`);
+}
+
+function saveUnitPriceSetting() {
+  const val = Number(document.getElementById("settingUnitPrice").value);
+  if (val <= 0) { alert("有効な価格を入力してください"); return; }
+  UNIT_PRICE = val;
+  localStorage.setItem("pos_unit_price", UNIT_PRICE);
+  alert(`金券単価を「${UNIT_PRICE.toLocaleString()}円」に更新しました！`);
+}
+
+function saveGasUrlSetting() {
+  const url = document.getElementById("settingGasUrl").value.trim();
+  if (!url.startsWith("https://script.google.com/")) {
+    alert("正しいGoogle Apps ScriptのURLを入力してください。");
+    return;
+  }
+  GAS_URL = url;
+  localStorage.setItem("pos_gas_url", GAS_URL);
+  alert("スプレッドシート連携URLを更新しました！");
+  if (navigator.onLine) fetchFromGAS(false);
+}
+
+// ── 13. パスキー認証テンキーモーダル ──
+function openPasskeyModal(promptText, callback) {
+  passkeyEntered = "";
+  passkeySuccessCallback = callback;
+  document.getElementById("passkeyInput").value = "";
+  document.getElementById("passkeyErrorMsg").innerText = "";
+  document.getElementById("passkeyPromptText").innerText = promptText;
+  document.getElementById("passkeyModal").classList.add("show");
+}
+
+function closePasskeyModal() {
+  document.getElementById("passkeyModal").classList.remove("show");
+  passkeyEntered = "";
+}
+
+function inputPasskey(num) {
+  playSound("tap");
+  if (passkeyEntered.length >= 4) return;
+  passkeyEntered += num;
+  document.getElementById("passkeyInput").value = passkeyEntered;
+
+  if (passkeyEntered.length === 4) {
+    if (passkeyEntered === ADMIN_PASSKEY) {
+      const cb = passkeySuccessCallback;
+      closePasskeyModal();
+      if (cb) {
+        // モーダルが閉じた後にコールバックを確実に実行
+        setTimeout(cb, 250);
+      }
+    } else {
+      document.getElementById("passkeyErrorMsg").innerText = "パスキーが正しくありません";
+      playSound("error");
+      setTimeout(clearPasskey, 500);
+    }
+  }
+}
+
+function clearPasskey() {
+  passkeyEntered = "";
+  document.getElementById("passkeyInput").value = "";
+  document.getElementById("passkeyErrorMsg").innerText = "";
+}
+
+function backspacePasskey() {
+  playSound("tap");
+  passkeyEntered = passkeyEntered.slice(0, -1);
+  document.getElementById("passkeyInput").value = passkeyEntered;
+  document.getElementById("passkeyErrorMsg").innerText = "";
+}
+
+// ── 初期化リクエスト（修正版：確実に動作） ──
+function requestResetWithPasskey() {
+  openPasskeyModal("初期化を実行するには管理者パスキーを入力してください", () => {
+    if (confirm("【警告】端末内のデータを全て消去します。\n（本番開始前のテストデータ消去用）\n本当によろしいですか？")) {
+      executeResetAllData();
+    }
+  });
+}
+
+function executeResetAllData() {
+  orderHistory = [];
+  refundHistory = [];
+  trashHistory = [];
+  offlineQueue = [];
+
+  localStorage.removeItem("pos_sales_data_1");
+  localStorage.removeItem("pos_sales_data_2");
+  localStorage.removeItem("pos_refund_data_1");
+  localStorage.removeItem("pos_refund_data_2");
+  localStorage.removeItem("pos_trash_data_1");
+  localStorage.removeItem("pos_trash_data_2");
+  localStorage.removeItem("pos_offline_queue");
+
+  saveCurrentDayStorage();
+  renderAllManageViews();
+  updateOnlineStatus();
+
+  alert("端末データを完全にリセットしました！");
+}
+
+function saveCurrentDayStorage() {
+  localStorage.setItem(`pos_sales_data_${currentDay}`, JSON.stringify(orderHistory));
+  localStorage.setItem(`pos_refund_data_${currentDay}`, JSON.stringify(refundHistory));
+  localStorage.setItem(`pos_trash_data_${currentDay}`, JSON.stringify(trashHistory));
+}
+
+// ── 14. オフラインキュー ＆ 通信処理 ──
 function enqueueOrSend(action, payload) {
   if (!navigator.onLine) {
     offlineQueue.push({ id: "q_" + Date.now() + "_" + Math.random(), action, payload });
@@ -482,7 +894,7 @@ function enqueueOrSend(action, payload) {
 async function sendPostToGAS(action, payload) {
   if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) return;
   const formData = new FormData();
-  formData.append("data", JSON.stringify({ action: action, ...payload }));
+  formData.append("data", JSON.stringify({ action: action, day: currentDay, ...payload }));
   await fetch(GAS_URL, { method: "POST", mode: "no-cors", body: formData });
 }
 
@@ -493,7 +905,6 @@ function fetchFromGAS(isManual) {
     return;
   }
 
-  // オフライン未送信キューがあれば、まずそれを先に全て送信
   if (offlineQueue.length > 0) {
     flushOfflineQueue().then(() => fetchFromGAS(isManual));
     return;
@@ -504,20 +915,22 @@ function fetchFromGAS(isManual) {
 
   const callbackName = "gasCallback_" + Math.floor(Math.random() * 1000000);
   const script = document.createElement("script");
-  script.src = `${GAS_URL}?callback=${callbackName}&_=${Date.now()}`;
+  script.src = `${GAS_URL}?callback=${callbackName}&day=${currentDay}&_=${Date.now()}`;
 
   window[callbackName] = function(json) {
     if (json && json.status === "success") {
       if (Array.isArray(json.list)) {
         orderHistory = json.list;
-        localStorage.setItem("pos_sales_data", JSON.stringify(orderHistory));
+      }
+      if (Array.isArray(json.refundList)) {
+        refundHistory = json.refundList;
       }
       if (Array.isArray(json.trashList)) {
         trashHistory = json.trashList;
-        localStorage.setItem("pos_trash_data", JSON.stringify(trashHistory));
       }
-      renderManageTable();
-      console.log("スプシ同期完了（履歴・ゴミ箱）");
+      saveCurrentDayStorage();
+      renderAllManageViews();
+      console.log(`スプシ同期完了（${currentDay}日目: 販売・返金・ゴミ箱）`);
     }
     cleanup();
   };
@@ -536,8 +949,7 @@ function fetchFromGAS(isManual) {
   document.body.appendChild(script);
 }
 
-function onNavigate(screen) {
-  console.log("Navigate to:", screen);
-}
-
+// 起動時のUI初期化
+updateSoundUI();
+updateDayUI();
 if (navigator.onLine) fetchFromGAS(false);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>金券管理システム</title>
+  <title>柏苑祭運営 金券管理システム</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,13 +12,20 @@
   <div id="screenMenu" class="screen-view active">
     <header class="header">
       <div class="header-left">
-        <h1 class="header-title">金券管理システム</h1>
+        <h1 class="header-title">柏苑祭運営 金券管理システム</h1>
+        <span class="day-badge" id="currentDayBadgeMenu">1日目</span>
         <div class="status-badge status-online" id="statusBadgeMenu">
           <span class="status-dot"></span>
           <span class="status-text">オンライン</span>
         </div>
       </div>
-      <div class="header-clock live-clock">--:--:--</div>
+      <div class="header-right">
+        <button class="btn-sound-toggle" id="btnSoundToggle" onclick="toggleSound()">
+          <span id="soundIcon">🔊</span>
+          <span id="soundText">音声 ON</span>
+        </button>
+        <div class="header-clock live-clock">--:--:--</div>
+      </div>
     </header>
 
     <main class="menu-content">
@@ -27,13 +34,14 @@
         <span class="btn-subtext">購入受付</span>
       </button>
 
-      <button class="btn btn-refund" onclick="onNavigate('refund')">
+      <button class="btn btn-refund" onclick="openRefundScreen()">
         <span class="btn-text-medium">返金処理</span>
+        <span class="btn-subtext-refund">金券回収・払出</span>
       </button>
 
       <div class="sub-actions">
         <button class="btn btn-sub" onclick="openManageScreen()">集計・管理</button>
-        <button class="btn btn-sub" onclick="onNavigate('settings')">レジ設定</button>
+        <button class="btn btn-sub" onclick="openSettingsScreen()">レジ設定</button>
       </div>
     </main>
   </div>
@@ -43,6 +51,7 @@
     <header class="header">
       <div class="header-left">
         <button class="btn-back" onclick="closeSaleScreen()">戻る</button>
+        <span class="day-badge" id="currentDayBadgeSale">1日目</span>
         <div class="status-badge status-online" id="statusBadgeSale">
           <span class="status-dot"></span>
           <span class="status-text">オンライン</span>
@@ -162,12 +171,72 @@
     </div>
   </div>
 
-  <!-- ==================== 4. 集計・管理画面 ==================== -->
+  <!-- ==================== 4. 返金処理画面 ==================== -->
+  <div id="screenRefund" class="screen-view">
+    <header class="header">
+      <div class="header-left">
+        <button class="btn-back" onclick="closeRefundScreen()">戻る</button>
+        <span class="day-badge day-badge-refund" id="currentDayBadgeRefund">1日目</span>
+        <span class="refund-header-tag">返金受付</span>
+      </div>
+      <div class="header-clock live-clock">--:--:--</div>
+    </header>
+
+    <div class="display-container" onclick="collapseTray('refundKeypadTray')">
+      <div class="display-row" id="rowRefundSheetCount">
+        <span class="display-label">返金枚数</span>
+        <div class="display-value-wrap">
+          <span class="display-val text-refund" id="refundSheetCount">0</span>
+          <span class="display-unit">枚</span>
+        </div>
+      </div>
+
+      <div class="display-row display-refund-row" id="refundAmountRow">
+        <span class="display-label refund-label">返金総額 (払出)</span>
+        <div class="display-value-wrap">
+          <span class="display-val refund-val" id="refundTotalPrice">0</span>
+          <span class="display-unit refund-unit">円</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="keypad-tray slide-up" id="refundKeypadTray">
+      <div class="tray-handle" onclick="toggleTray('refundKeypadTray')">
+        <div class="handle-bar"></div>
+      </div>
+
+      <div class="keypad-layout">
+        <div class="keypad-grid">
+          <button class="key-btn" onclick="inputNumRefund('1')">1</button>
+          <button class="key-btn" onclick="inputNumRefund('2')">2</button>
+          <button class="key-btn" onclick="inputNumRefund('3')">3</button>
+          <button class="key-btn" onclick="inputNumRefund('4')">4</button>
+          <button class="key-btn" onclick="inputNumRefund('5')">5</button>
+          <button class="key-btn" onclick="inputNumRefund('6')">6</button>
+          <button class="key-btn" onclick="inputNumRefund('7')">7</button>
+          <button class="key-btn" onclick="inputNumRefund('8')">8</button>
+          <button class="key-btn" onclick="inputNumRefund('9')">9</button>
+          <button class="key-btn key-clear" onclick="clearInputRefund()">C</button>
+          <button class="key-btn" onclick="inputNumRefund('0')">0</button>
+          <button class="key-btn key-bs" onclick="backspaceRefund()">⌫</button>
+        </div>
+
+        <div class="confirm-column">
+          <button class="btn-action-flow btn-refund-action" id="btnRefundAction" onclick="handleRefundAction()">
+            <span id="btnRefundActionText">確定</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 5. 集計・管理画面（3タブ化） ==================== -->
   <div id="screenManage" class="screen-view">
     <header class="header">
       <div class="header-left">
         <button class="btn-back" onclick="closeManageScreen()">メニューへ戻る</button>
         <span class="manage-title">売上集計・履歴管理</span>
+        <span class="day-badge" id="currentDayBadgeManage">1日目</span>
         <div class="status-badge status-online" id="statusBadgeManage">
           <span class="status-dot"></span>
           <span class="status-text">オンライン</span>
@@ -179,58 +248,187 @@
       </div>
     </header>
 
-    <div class="manage-summary-grid">
-      <div class="summary-card">
-        <span class="card-label">合計販売枚数</span>
-        <div class="card-val-wrap">
-          <span class="card-val" id="summaryTotalSheets">0</span>
-          <span class="card-unit">枚</span>
+    <!-- 3タブバー -->
+    <div class="manage-nav-tabs">
+      <button class="manage-nav-btn active" id="tabNavSummary" onclick="switchMainTab('summary')">📊 総合サマリー</button>
+      <button class="manage-nav-btn" id="tabNavSale" onclick="switchMainTab('sale')">💰 販売履歴</button>
+      <button class="manage-nav-btn" id="tabNavRefund" onclick="switchMainTab('refund')">↩️ 返金履歴</button>
+    </div>
+
+    <!-- タブ1: 総合サマリービュー -->
+    <div class="manage-tab-content active" id="tabContentSummary">
+      <div class="summary-hero-card">
+        <span class="hero-label">本日純売上（販売 − 返金）</span>
+        <div class="hero-val-wrap">
+          <span class="hero-val" id="sumNetSales">0</span>
+          <span class="hero-unit">円</span>
         </div>
       </div>
-      <div class="summary-card primary-card">
-        <span class="card-label">総合売上金額</span>
-        <div class="card-val-wrap">
-          <span class="card-val" id="summaryTotalSales">0</span>
-          <span class="card-unit">円</span>
+
+      <div class="summary-breakdown-grid">
+        <div class="breakdown-card card-sale-side">
+          <span class="breakdown-title">販売合計</span>
+          <div class="breakdown-row">
+            <span>枚数:</span>
+            <strong><span id="sumSaleSheets">0</span> 枚</strong>
+          </div>
+          <div class="breakdown-row">
+            <span>金額:</span>
+            <strong><span id="sumSaleAmount">0</span> 円</strong>
+          </div>
+          <div class="breakdown-row">
+            <span>件数:</span>
+            <span><span id="sumSaleOrders">0</span> 件</span>
+          </div>
         </div>
-      </div>
-      <div class="summary-card">
-        <span class="card-label">有効取引件数</span>
-        <div class="card-val-wrap">
-          <span class="card-val" id="summaryTotalOrders">0</span>
-          <span class="card-unit">件</span>
+
+        <div class="breakdown-card card-refund-side">
+          <span class="breakdown-title">返金合計 (払出)</span>
+          <div class="breakdown-row">
+            <span>枚数:</span>
+            <strong><span id="sumRefundSheets">0</span> 枚</strong>
+          </div>
+          <div class="breakdown-row">
+            <span>金額:</span>
+            <strong><span id="sumRefundAmount">0</span> 円</strong>
+          </div>
+          <div class="breakdown-row">
+            <span>件数:</span>
+            <span><span id="sumRefundOrders">0</span> 件</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 履歴／ゴミ箱 タブバー -->
-    <div class="manage-tab-bar">
-      <div class="tab-group">
-        <button class="tab-btn active" id="tabActive" onclick="switchManageTab('active')">販売履歴</button>
-        <button class="tab-btn" id="tabTrash" onclick="switchManageTab('trash')">
-          削除履歴（ゴミ箱） <span class="trash-badge" id="trashCountBadge">0</span>
-        </button>
+    <!-- タブ2: 販売履歴ビュー -->
+    <div class="manage-tab-content" id="tabContentSale">
+      <div class="manage-tab-bar">
+        <div class="tab-group">
+          <button class="tab-btn active" id="subTabActive" onclick="switchSaleSubTab('active')">販売中データ</button>
+          <button class="tab-btn" id="subTabTrash" onclick="switchSaleSubTab('trash')">
+            削除履歴 (ゴミ箱) <span class="trash-badge" id="trashCountBadge">0</span>
+          </button>
+        </div>
+
+        <div class="table-action-bar" id="activeActionBar">
+          <span class="selection-status">選択: <strong id="selectedCountText">0</strong>件</span>
+          <button class="btn-bulk-delete" id="btnBulkDelete" onclick="deleteSelectedRows()" disabled>
+            選択したデータを削除
+          </button>
+        </div>
       </div>
 
-      <div class="table-action-bar" id="activeActionBar">
-        <span class="selection-status">選択: <strong id="selectedCountText">0</strong>件</span>
-        <button class="btn-bulk-delete" id="btnBulkDelete" onclick="deleteSelectedRows()" disabled>
-          選択したデータを削除
-        </button>
+      <div class="table-scroll-container">
+        <table class="data-table">
+          <thead>
+            <tr id="tableHeaderRow"></tr>
+          </thead>
+          <tbody id="dataTableBody"></tbody>
+        </table>
       </div>
     </div>
 
-    <div class="table-scroll-container">
-      <table class="data-table">
-        <thead>
-          <tr id="tableHeaderRow"></tr>
-        </thead>
-        <tbody id="dataTableBody"></tbody>
-      </table>
+    <!-- タブ3: 返金履歴ビュー -->
+    <div class="manage-tab-content" id="tabContentRefund">
+      <div class="manage-tab-bar">
+        <span class="selection-status">返金記録件数: <strong id="refundTotalCountText">0</strong>件</span>
+      </div>
+
+      <div class="table-scroll-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>返金No.</th>
+              <th>時刻</th>
+              <th>返金枚数</th>
+              <th>払出金額</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="refundTableBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- ==================== 5. 編集モーダル ==================== -->
+  <!-- ==================== 6. レジ設定画面 ==================== -->
+  <div id="screenSettings" class="screen-view">
+    <header class="header">
+      <div class="header-left">
+        <button class="btn-back" onclick="closeSettingsScreen()">メニューへ戻る</button>
+        <h2 class="header-title">レジ設定</h2>
+      </div>
+      <div class="header-clock live-clock">--:--:--</div>
+    </header>
+
+    <div class="settings-scroll-container">
+      <div class="settings-card">
+        <h3 class="settings-card-title">開催日設定</h3>
+        <p class="settings-desc">切り替えるとスプレッドシートの参照先（販売・返金データ1 / 2）も自動連動します。</p>
+        <div class="day-toggle-group">
+          <button class="btn-day-select active" id="btnDay1" onclick="setDay('1')">1日目 (Day 1)</button>
+          <button class="btn-day-select" id="btnDay2" onclick="setDay('2')">2日目 (Day 2)</button>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3 class="settings-card-title">金券単価設定</h3>
+        <div class="settings-field-row">
+          <label>金券1枚の価格 (円)</label>
+          <div class="input-with-unit">
+            <input type="number" id="settingUnitPrice" min="10" step="10">
+            <span class="unit-text">円</span>
+          </div>
+        </div>
+        <button class="btn-settings-save" onclick="saveUnitPriceSetting()">単価を変更</button>
+      </div>
+
+      <div class="settings-card">
+        <h3 class="settings-card-title">スプレッドシート連携 (GAS URL)</h3>
+        <p class="settings-desc">接続先スプレッドシートのWebアプリURLを変更できます。</p>
+        <input type="text" id="settingGasUrl" class="input-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
+        <button class="btn-settings-save" onclick="saveGasUrlSetting()">URLを保存</button>
+      </div>
+
+      <div class="settings-card danger-card">
+        <h3 class="settings-card-title text-danger">⚠️ 端末データのリセット（本番前初期化）</h3>
+        <p class="settings-desc">テスト入力した端末内の全販売・返金データとキューを完全に消去します。<br>実行には管理者パスキーが必要です。</p>
+        <button class="btn-danger-reset" onclick="requestResetWithPasskey()">端末データを完全初期化</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 7. 管理者パスキー認証テンキーモーダル ==================== -->
+  <div class="modal-backdrop" id="passkeyModal">
+    <div class="passkey-card">
+      <h3 class="passkey-title">管理者認証</h3>
+      <p class="passkey-desc" id="passkeyPromptText">パスキーを入力してください</p>
+      
+      <div class="passkey-pin-display">
+        <input type="password" id="passkeyInput" readonly maxlength="4" placeholder="••••">
+      </div>
+      <div class="passkey-error-msg" id="passkeyErrorMsg"></div>
+
+      <div class="passkey-keypad">
+        <button class="pkey-btn" onclick="inputPasskey('1')">1</button>
+        <button class="pkey-btn" onclick="inputPasskey('2')">2</button>
+        <button class="pkey-btn" onclick="inputPasskey('3')">3</button>
+        <button class="pkey-btn" onclick="inputPasskey('4')">4</button>
+        <button class="pkey-btn" onclick="inputPasskey('5')">5</button>
+        <button class="pkey-btn" onclick="inputPasskey('6')">6</button>
+        <button class="pkey-btn" onclick="inputPasskey('7')">7</button>
+        <button class="pkey-btn" onclick="inputPasskey('8')">8</button>
+        <button class="pkey-btn" onclick="inputPasskey('9')">9</button>
+        <button class="pkey-btn pkey-clear" onclick="clearPasskey()">C</button>
+        <button class="pkey-btn" onclick="inputPasskey('0')">0</button>
+        <button class="pkey-btn pkey-bs" onclick="backspacePasskey()">⌫</button>
+      </div>
+
+      <button class="btn-passkey-cancel" onclick="closePasskeyModal()">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- ==================== 8. 編集モーダル ==================== -->
   <div class="modal-backdrop" id="editModal">
     <div class="edit-card">
       <h3 class="edit-title">取引データの変更 (No.<span id="editNoText"></span>)</h3>
@@ -253,16 +451,16 @@
     </div>
   </div>
 
-  <!-- ==================== 6. 完了モーダル ==================== -->
+  <!-- ==================== 9. 完了モーダル ==================== -->
   <div class="modal-backdrop" id="completionModal">
-    <div class="success-card">
+    <div class="success-card" id="successCard">
       <div class="svg-check-wrapper">
         <svg class="checkmark-svg" viewBox="0 0 52 52">
-          <circle class="checkmark-circle" cx="26" cy="26" r="24" fill="none"/>
-          <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+          <circle class="checkmark-circle" id="checkmarkCircle" cx="26" cy="26" r="24" fill="none"/>
+          <path class="checkmark-check" id="checkmarkPath" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
         </svg>
       </div>
-      <h2 class="modal-title">販売完了</h2>
+      <h2 class="modal-title" id="modalTitle">販売完了</h2>
       <p class="modal-subtitle" id="modalSummary">0枚 0円</p>
     </div>
   </div>
