@@ -8,6 +8,35 @@
 </head>
 <body>
 
+  <!-- ==================== 0. 初回アクセス起動ロック画面 ==================== -->
+  <div class="lock-screen-overlay" id="appLockScreen">
+    <div class="lock-card">
+      <div class="lock-icon-badge">🔒</div>
+      <h2 class="lock-title">柏苑祭運営 金券管理システム</h2>
+      <p class="lock-desc">関係者専用システムです。<br>認証パスキーを入力して起動してください。</p>
+
+      <div class="passkey-pin-display">
+        <input type="password" id="bootPasskeyInput" readonly maxlength="4" placeholder="••••">
+      </div>
+      <div class="passkey-error-msg" id="bootPasskeyError"></div>
+
+      <div class="passkey-keypad">
+        <button class="pkey-btn" onclick="inputBootPasskey('1')">1</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('2')">2</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('3')">3</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('4')">4</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('5')">5</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('6')">6</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('7')">7</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('8')">8</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('9')">9</button>
+        <button class="pkey-btn pkey-clear" onclick="clearBootPasskey()">C</button>
+        <button class="pkey-btn" onclick="inputBootPasskey('0')">0</button>
+        <button class="pkey-btn pkey-bs" onclick="backspaceBootPasskey()">⌫</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== 1. メインメニュー画面 ==================== -->
   <div id="screenMenu" class="screen-view active">
     <header class="header">
@@ -184,7 +213,6 @@
     </header>
 
     <div class="display-container" onclick="collapseTray('refundKeypadTray')">
-      <!-- バラ表記ガイド付き枚数入力 -->
       <div class="display-row" id="rowRefundSheetCount">
         <div class="refund-label-wrap">
           <span class="display-label">返金枚数</span>
@@ -259,7 +287,7 @@
       <button class="manage-nav-btn" id="tabNavRefund" onclick="switchMainTab('refund')">↩️ 返金履歴</button>
     </div>
 
-    <!-- タブ1: 総合サマリービュー -->
+    <!-- タブ1: 総合サマリー -->
     <div class="manage-tab-content active" id="tabContentSummary">
       <div class="summary-hero-card">
         <span class="hero-label">本日純売上（総販売額 − 総返金額）</span>
@@ -286,7 +314,7 @@
       </div>
     </div>
 
-    <!-- タブ2: 販売履歴ビュー（トップにサマリー見出しを完全復活） -->
+    <!-- タブ2: 販売履歴 -->
     <div class="manage-tab-content" id="tabContentSale">
       <div class="history-stat-grid">
         <div class="stat-pill-card">
@@ -329,7 +357,7 @@
       </div>
     </div>
 
-    <!-- タブ3: 返金履歴ビュー（同様にトップサマリー見出し付き） -->
+    <!-- タブ3: 返金履歴 -->
     <div class="manage-tab-content" id="tabContentRefund">
       <div class="history-stat-grid">
         <div class="stat-pill-card">
@@ -378,7 +406,6 @@
     </header>
 
     <div class="settings-scroll-container">
-      <!-- 1. 開催日設定 ＆ 本番モード切替 ＆ 開始トリガー -->
       <div class="settings-card">
         <div class="card-head-between">
           <h3 class="settings-card-title">開催日設定・開始</h3>
@@ -408,7 +435,6 @@
         </button>
       </div>
 
-      <!-- 2. 金券単価設定 (セット販売 ＆ バラ返金) -->
       <div class="settings-card">
         <h3 class="settings-card-title">金券単価設定</h3>
         <div class="settings-field-row">
@@ -428,14 +454,12 @@
         <button class="btn-settings-save" onclick="saveUnitPriceSettings()">単価設定を保存</button>
       </div>
 
-      <!-- 3. スプシGAS URL設定 -->
       <div class="settings-card">
         <h3 class="settings-card-title">スプレッドシート連携 (GAS URL)</h3>
         <input type="text" id="settingGasUrl" class="input-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
         <button class="btn-settings-save" onclick="saveGasUrlSetting()">URLを保存</button>
       </div>
 
-      <!-- 4. 危険操作（初期化の分離） -->
       <div class="settings-card danger-card">
         <h3 class="settings-card-title text-danger">⚠️ データ初期化 (管理者認証)</h3>
         <p class="settings-desc">目的別に完全に分離して初期化を実行できます。</p>
@@ -449,7 +473,6 @@
         </div>
       </div>
 
-      <!-- 5. 巨大 日次精算ボタン -->
       <div class="settlement-launch-section">
         <button class="btn-launch-settlement" onclick="openSettlementModal()">
           <span class="settle-btn-sub">レジ締め・現金実査・帳簿突き合わせ</span>
@@ -470,9 +493,8 @@
         <button class="btn-close-settle" onclick="closeSettlementModal()">✕ 閉じる</button>
       </div>
 
-      <!-- T勘定 左右対照表 -->
       <div class="t-account-container">
-        <!-- 左側：受入 (借方) -->
+        <!-- 左側：受入 -->
         <div class="t-side left-side">
           <div class="t-side-header">【 受 入 (受取・元入) 】</div>
 
@@ -493,7 +515,6 @@
           </div>
 
           <div class="t-row t-row-blank"></div>
-
           <div class="t-row t-row-blank"></div>
 
           <div class="t-row t-row-5">
@@ -507,12 +528,11 @@
 
         <div class="t-divider"></div>
 
-        <!-- 右側：払出 (貸方) -->
+        <!-- 右側：払出 -->
         <div class="t-side right-side">
           <div class="t-side-header">【 払 出 (支払・釣銭) 】</div>
 
           <div class="t-row t-row-blank"></div>
-
           <div class="t-row t-row-blank"></div>
 
           <div class="t-row t-row-3">
@@ -541,7 +561,6 @@
         </div>
       </div>
 
-      <!-- 筆算の合計線 ＆ 各側合計 -->
       <div class="t-totals-bar">
         <div class="total-box left-total-box">
           <span class="t-subtotal-label">受入合計:</span>
@@ -553,7 +572,6 @@
         </div>
       </div>
 
-      <!-- 下段：残高突き合わせ ＆ 雑益・雑損 -->
       <div class="settle-reconciliation-panel">
         <div class="reconcile-row">
           <span class="rec-label">① 帳簿残高 (受入合計 − 払出合計)</span>

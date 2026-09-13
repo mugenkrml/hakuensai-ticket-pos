@@ -5,6 +5,10 @@ let GAS_URL = localStorage.getItem("pos_gas_url") || DEFAULT_GAS_URL;
 // 管理者パスキー
 const ADMIN_PASSKEY = "1207";
 
+// アプリの起動ロック状態（リロードするまで解除維持）
+let isAppUnlocked = false;
+let bootPasskeyEntered = "";
+
 // 金券単価設定（セット販売用 ＆ バラ返金用）
 let UNIT_PRICE = Number(localStorage.getItem("pos_unit_price") || 500);
 let REFUND_UNIT_PRICE = Number(localStorage.getItem("pos_refund_unit_price") || 50);
@@ -41,7 +45,7 @@ let currentMainTab = "summary";
 let saleSubTab = "active";
 let editingOrderId = null;
 
-// パスキー入力状態
+// 管理者用パスキー入力状態
 let passkeyEntered = "";
 let passkeySuccessCallback = null;
 
@@ -56,7 +60,7 @@ function cleanTimeStr(str) {
   return s;
 }
 
-// ── Web Audio API による極上効果音エンジン（リアル触感版） ──
+// ── Web Audio API による極上・多彩UI効果音エンジン ──
 let audioCtx = null;
 
 function soundEffect(type) {
@@ -78,77 +82,98 @@ function soundEffect(type) {
 
     const now = audioCtx.currentTime;
 
+    // 1. テンキー入力（高級マリンバ・硬質ウッドブロック調）
     if (type === 'tap') {
-      // ★超進化：高級スイッチのような「カチッ・コトッ」というソリッド打鍵音
-      // ① アタックノイズ（指先の摩擦・スイッチの感触）
-      const bufSize = Math.floor(audioCtx.sampleRate * 0.015);
-      const buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) {
-        data[i] = Math.random() * 2 - 1;
+      const randomPitchOffset = (Math.random() * 60) - 30;
+      const baseFreq = 860 + randomPitchOffset;
+
+      const attackBuf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.008), audioCtx.sampleRate);
+      const data = attackBuf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.3));
       }
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = buffer;
+      const attackSource = audioCtx.createBufferSource();
+      attackSource.buffer = attackBuf;
 
-      const noiseFilter = audioCtx.createBiquadFilter();
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.setValueAtTime(2600, now);
-      noiseFilter.Q.setValueAtTime(3.2, now);
+      const attackFilter = audioCtx.createBiquadFilter();
+      attackFilter.type = 'bandpass';
+      attackFilter.frequency.setValueAtTime(3200, now);
+      attackFilter.Q.setValueAtTime(4.0, now);
 
-      const noiseGain = audioCtx.createGain();
-      noiseGain.gain.setValueAtTime(0.35, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+      const attackGain = audioCtx.createGain();
+      attackGain.gain.setValueAtTime(0.4, now);
+      attackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
 
-      noise.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(audioCtx.destination);
-      noise.start(now);
+      attackSource.connect(attackFilter);
+      attackFilter.connect(attackGain);
+      attackGain.connect(audioCtx.destination);
+      attackSource.start(now);
 
-      // ② 底打ちレゾナンス（コトッとした小気味よい木製・プラスチック響き）
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(540, now);
-      osc.frequency.exponentialRampToValueAtTime(180, now + 0.035);
-
-      gain.gain.setValueAtTime(0.28, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
-
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.035);
-
-    } else if (type === 'backspace') {
-      // BS：少し鈍く重い「ボフッ」という押し戻し感
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(280, now);
-      osc.frequency.exponentialRampToValueAtTime(120, now + 0.045);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.045);
-
-    } else if (type === 'clear') {
-      // クリア（C）：シュッとしたスイープ下降音
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(650, now);
-      osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+      osc.frequency.setValueAtTime(baseFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.35, now + 0.038);
+
+      gain.gain.setValueAtTime(0.32, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.038);
+
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start(now);
-      osc.stop(now + 0.08);
+      osc.stop(now + 0.038);
 
+    // 2. バックスペース（BS）
+    } else if (type === 'backspace') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(360, now + 0.025);
+      osc.frequency.exponentialRampToValueAtTime(120, now + 0.05);
+
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+
+    // 3. クリア（C）
+    } else if (type === 'clear') {
+      const carrier = audioCtx.createOscillator();
+      const modulator = audioCtx.createOscillator();
+      const modGain = audioCtx.createGain();
+      const mainGain = audioCtx.createGain();
+
+      carrier.type = 'sine';
+      modulator.type = 'sine';
+
+      carrier.frequency.setValueAtTime(900, now);
+      carrier.frequency.exponentialRampToValueAtTime(220, now + 0.09);
+
+      modulator.frequency.setValueAtTime(300, now);
+      modulator.frequency.exponentialRampToValueAtTime(80, now + 0.09);
+
+      modGain.gain.setValueAtTime(400, now);
+      modGain.gain.exponentialRampToValueAtTime(1, now + 0.09);
+
+      mainGain.gain.setValueAtTime(0.25, now);
+      mainGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+      modulator.connect(modGain);
+      modGain.connect(carrier.frequency);
+      carrier.connect(mainGain);
+      mainGain.connect(audioCtx.destination);
+
+      modulator.start(now);
+      carrier.start(now);
+      modulator.stop(now + 0.09);
+      carrier.stop(now + 0.09);
+
+    // 4. 確定 / 次へ（ピピッ音）
     } else if (type === 'confirm') {
-      // 確定 / 次へ：軽快な上昇ピピッ音
       [0, 0.06].forEach((delay, i) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -162,9 +187,9 @@ function soundEffect(type) {
         osc.stop(now + delay + 0.08);
       });
 
+    // 5. 会計完了（ポロロ〜ン和音チャイム）
     } else if (type === 'success') {
-      // 会計完了（OK）：明るく響く美しいメジャー和音チャイム
-      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      const notes = [523.25, 659.25, 783.99, 1046.50];
       notes.forEach((freq, i) => {
         const delay = i * 0.07;
         const osc = audioCtx.createOscillator();
@@ -179,41 +204,81 @@ function soundEffect(type) {
         osc.stop(now + delay + 0.45);
       });
 
+    // 6. 返金完了（温かみのあるベル音）
     } else if (type === 'refund') {
-      // 返金完了：穏やかな和音
-      const notes = [659.25, 523.25];
+      const notes = [783.99, 587.33];
       notes.forEach((freq, i) => {
-        const delay = i * 0.1;
+        const delay = i * 0.09;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = 'triangle';
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now + delay);
-        gain.gain.setValueAtTime(0.3, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.35);
+        gain.gain.setValueAtTime(0.28, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.38);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(now + delay);
-        osc.stop(now + delay + 0.35);
+        osc.stop(now + delay + 0.38);
       });
 
+    // 7. エラー・警告音
     } else if (type === 'error') {
-      // エラー / 警告：低音ブブッ
-      [0, 0.1].forEach((delay) => {
+      [0, 0.08].forEach((delay) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, now + delay);
-        gain.gain.setValueAtTime(0.3, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.08);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(140, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(70, now + delay + 0.07);
+        gain.gain.setValueAtTime(0.35, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.07);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(now + delay);
-        osc.stop(now + delay + 0.08);
+        osc.stop(now + delay + 0.07);
       });
     }
   } catch (err) {
     console.warn("Audio error:", err);
   }
+}
+
+// ── 0. 初回アクセス起動ロック認証 ──
+function inputBootPasskey(num) {
+  soundEffect('tap');
+  if (bootPasskeyEntered.length >= 4) return;
+  bootPasskeyEntered += num;
+  document.getElementById("bootPasskeyInput").value = bootPasskeyEntered;
+
+  if (bootPasskeyEntered.length === 4) {
+    if (bootPasskeyEntered === ADMIN_PASSKEY) {
+      soundEffect('confirm');
+      document.getElementById("bootPasskeyError").innerText = "";
+      setTimeout(() => {
+        isAppUnlocked = true;
+        document.getElementById("appLockScreen").classList.add("unlocked");
+        // ロック解除後に初回同期を開始
+        if (navigator.onLine) fetchFromGAS(false);
+      }, 200);
+    } else {
+      soundEffect('error');
+      document.getElementById("bootPasskeyError").innerText = "認証に失敗しました";
+      setTimeout(clearBootPasskey, 500);
+    }
+  }
+}
+
+function clearBootPasskey() {
+  soundEffect('clear');
+  bootPasskeyEntered = "";
+  document.getElementById("bootPasskeyInput").value = "";
+  document.getElementById("bootPasskeyError").innerText = "";
+}
+
+function backspaceBootPasskey() {
+  soundEffect('backspace');
+  bootPasskeyEntered = bootPasskeyEntered.slice(0, -1);
+  document.getElementById("bootPasskeyInput").value = bootPasskeyEntered;
+  document.getElementById("bootPasskeyError").innerText = "";
 }
 
 // ── 音声トグル切り替え ──
@@ -1268,7 +1333,7 @@ function requestConfirmSettlement() {
   });
 }
 
-// ── 15. パスキー認証モーダル ──
+// ── 15. パスキー認証モーダル（設定・リセット・精算時用） ──
 function openPasskeyModal(promptText, callback) {
   passkeyEntered = "";
   passkeySuccessCallback = callback;
@@ -1348,6 +1413,8 @@ async function sendPostToGAS(action, payload) {
 
 function fetchFromGAS(isManual) {
   if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) return;
+  // ロック解除前は同期通信もブロック
+  if (!isAppUnlocked && !isManual) return;
   if (!navigator.onLine) {
     if (isManual) alert("オフラインのためスプレッドシートから読み込めません。");
     return;
@@ -1401,4 +1468,3 @@ function fetchFromGAS(isManual) {
 updateSoundUI();
 updateDayUI();
 updateProdModeUI();
-if (navigator.onLine) fetchFromGAS(false);
