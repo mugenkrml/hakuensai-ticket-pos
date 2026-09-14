@@ -1,7 +1,9 @@
-// ★★★ セキュア設定 ★★★
-const ADMIN_PASSKEY = localStorage.getItem("pos_admin_passkey") || "1207";
-const DEFAULT_GAS_URL = "";
+// ★★★ Google Apps Script ウェブアプリURL ★★★
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbzvkpbYbCp_2grTdcpxu8m5IOXrTGLSFhdJTXP8Z3BXKHWBNDMMBh2rcUx6VQHHX4Nq5g/exec";
 let GAS_URL = localStorage.getItem("pos_gas_url") || DEFAULT_GAS_URL;
+
+// 管理者パスキー
+const ADMIN_PASSKEY = "1207";
 
 // アプリの起動ロック状態（リロードするまで解除維持）
 let isAppUnlocked = false;
@@ -58,42 +60,22 @@ function cleanTimeStr(str) {
   return s;
 }
 
-// ── Web Audio API による極上・多彩UI効果音エンジン（枚数連動豪華完了音対応） ──
+// ── Web Audio API による極上・多彩UI効果音エンジン（新・段階的完了音対応） ──
 let audioCtx = null;
-let isAudioUnlocked = false;
-
-function initAndUnlockAudio() {
-  if (isAudioUnlocked && audioCtx && audioCtx.state === 'running') return;
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!audioCtx && AudioContextClass) {
-      audioCtx = new AudioContextClass();
-    }
-    if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    const silentBuffer = audioCtx.createBuffer(1, 1, 22050);
-    const source = audioCtx.createBufferSource();
-    source.buffer = silentBuffer;
-    source.connect(audioCtx.destination);
-    source.start(0);
-    isAudioUnlocked = true;
-  } catch (e) {
-    console.warn("Audio unlock error:", e);
-  }
-}
-
-window.addEventListener('touchstart', initAndUnlockAudio, { passive: true });
-window.addEventListener('touchend', initAndUnlockAudio, { passive: true });
-window.addEventListener('click', initAndUnlockAudio, { passive: true });
 
 function soundEffect(type, customParam) {
   if (!isSoundEnabled) return;
-  initAndUnlockAudio();
-  if (!audioCtx) return;
 
   try {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+    }
+
+    if (!audioCtx) return;
+
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
@@ -205,14 +187,15 @@ function soundEffect(type, customParam) {
         osc.stop(now + delay + 0.08);
       });
 
-    // 5. 会計完了（枚数に応じた可変ラグジュアリーサウンド）
+    // 5. 会計完了（1枚目は現行固定、2〜5枚以上は新・段階的シンセサウンド）
     } else if (type === 'success') {
       const sheets = Number(customParam || 1);
 
-      const playBell = (freq, delay, dur = 0.45, gainVal = 0.22) => {
+      // 共通の音符鳴らし用ヘルパー
+      const playTone = (freq, delay, dur, gainVal = 0.22, typeName = 'sine') => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = 'sine';
+        osc.type = typeName;
         osc.frequency.setValueAtTime(freq, now + delay);
         gain.gain.setValueAtTime(gainVal, now + delay);
         gain.gain.exponentialRampToValueAtTime(0.001, now + delay + dur);
@@ -222,44 +205,40 @@ function soundEffect(type, customParam) {
         osc.stop(now + delay + dur);
       };
 
-      const playHarpPluck = (freq, delay) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + delay);
-        gain.gain.setValueAtTime(0.18, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.18);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now + delay);
-        osc.stop(now + delay + 0.18);
-      };
-
       if (sheets === 1) {
+        // 【1枚】現行のままの美しい基準チャイム
         const notes = [523.25, 659.25, 783.99, 1046.50];
-        notes.forEach((freq, i) => playBell(freq, i * 0.07, 0.45, 0.24));
+        notes.forEach((freq, i) => {
+          playTone(freq, i * 0.07, 0.45, 0.25, 'sine');
+        });
       } else if (sheets === 2) {
-        playBell(261.63, 0, 0.55, 0.22);
-        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
-        notes.forEach((freq, i) => playBell(freq, i * 0.065, 0.48, 0.22));
+        // 【2枚】新感覚：キュートな上昇ポップシンセ（ペンタトニック上昇）
+        const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+        notes.forEach((freq, i) => {
+          playTone(freq, i * 0.055, 0.35, 0.23, 'triangle');
+        });
       } else if (sheets === 3) {
-        const harpNotes = [392.00, 523.25, 659.25, 783.99];
-        harpNotes.forEach((freq, i) => playHarpPluck(freq, i * 0.045));
-        const bellNotes = [523.25, 659.25, 1046.50, 1318.51];
-        bellNotes.forEach((freq, i) => playBell(freq, 0.18 + (i * 0.06), 0.5, 0.22));
+        // 【3枚】新感覚：軽快なコインゲット風・連打アルペジオ
+        const notes = [523.25, 659.25, 783.99, 987.77, 1318.51]; // C5, E5, G5, B5, E6
+        notes.forEach((freq, i) => {
+          playTone(freq, i * 0.045, 0.3, 0.2, 'sine');
+        });
       } else if (sheets === 4) {
-        playBell(261.63, 0, 0.65, 0.2);
-        const harpNotes = [329.63, 392.00, 493.88, 587.33, 659.25];
-        harpNotes.forEach((freq, i) => playHarpPluck(freq, i * 0.035));
-        const bellNotes = [659.25, 783.99, 987.77, 1174.66, 1567.98];
-        bellNotes.forEach((freq, i) => playBell(freq, 0.16 + (i * 0.055), 0.55, 0.2));
+        // 【4枚】新感覚：リッチでドラマチックなパワーコード展開
+        playTone(349.23, 0, 0.5, 0.22, 'triangle'); // F4ベース
+        playTone(523.25, 0.06, 0.45, 0.22, 'sine');
+        playTone(659.25, 0.12, 0.45, 0.22, 'sine');
+        playTone(880.00, 0.18, 0.5, 0.25, 'sine');
       } else {
-        playBell(261.63, 0, 0.75, 0.25);
-        playBell(392.00, 0.03, 0.75, 0.18);
-        const sweep = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
-        sweep.forEach((freq, i) => playHarpPluck(freq, i * 0.03));
-        const sparkles = [1046.50, 1318.51, 1567.98, 2093.00];
-        sparkles.forEach((freq, i) => playBell(freq, 0.22 + (i * 0.05), 0.6, 0.18));
+        // 【5枚以上】新感覚：最高峰・きらめくスターダスト・ゲインサウンド
+        const baseNotes = [392.00, 587.33, 783.99]; // G4, D5, G5
+        baseNotes.forEach((f, i) => playTone(f, i * 0.03, 0.6, 0.2, 'triangle'));
+        
+        // 高音域のキラキラした連打スパークル
+        const sparkles = [1046.50, 1174.66, 1318.51, 1567.98, 2093.00];
+        sparkles.forEach((freq, i) => {
+          playTone(freq, 0.12 + (i * 0.04), 0.4, 0.18, 'sine');
+        });
       }
 
     // 6. 返金完了（温かみのあるベル音）
@@ -288,7 +267,7 @@ function soundEffect(type, customParam) {
         osc.frequency.setValueAtTime(140, now + delay);
         osc.frequency.exponentialRampToValueAtTime(70, now + delay + 0.07);
         gain.gain.setValueAtTime(0.35, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.07);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(now + delay);
@@ -314,7 +293,8 @@ function inputBootPasskey(num) {
       setTimeout(() => {
         isAppUnlocked = true;
         document.getElementById("appLockScreen").classList.add("unlocked");
-        if (navigator.onLine && GAS_URL) fetchFromGAS(false);
+        // ロック解除後に初回同期を開始
+        if (navigator.onLine) fetchFromGAS(false);
       }, 200);
     } else {
       soundEffect('error');
@@ -406,7 +386,7 @@ async function updateOnlineStatus() {
     }
   });
 
-  if (isOnline && offlineQueue.length > 0 && GAS_URL) {
+  if (isOnline && offlineQueue.length > 0) {
     await flushOfflineQueue();
     fetchFromGAS(false);
   }
@@ -416,7 +396,9 @@ window.addEventListener("offline", updateOnlineStatus);
 updateOnlineStatus();
 
 async function flushOfflineQueue() {
-  if (offlineQueue.length === 0 || !navigator.onLine || !GAS_URL) return;
+  if (offlineQueue.length === 0 || !navigator.onLine) return;
+  console.log("未送信キュー送信中...", offlineQueue.length, "件");
+
   const queueToSend = [...offlineQueue];
   for (const item of queueToSend) {
     try {
@@ -424,6 +406,7 @@ async function flushOfflineQueue() {
       offlineQueue = offlineQueue.filter(q => q.id !== item.id);
       localStorage.setItem("pos_offline_queue", JSON.stringify(offlineQueue));
     } catch (err) {
+      console.warn("キュー再送中断:", err);
       break;
     }
   }
@@ -619,8 +602,8 @@ function getNextOrderNo() {
 
 function completeOrder() {
   const sheets = Number(saleCountStr);
-  soundEffect('success', sheets); // ★枚数ごとの豪華な完了音を確実に実行
-
+  soundEffect('success', sheets); // ★枚数ごとの新しい完了音を渡して実行
+  
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
   const received = Number(payReceivedStr);
@@ -702,7 +685,7 @@ function handleRefundAction() {
     isRefundConfirmed = true;
     const btn = document.getElementById("btnRefundAction");
     btn.classList.add("mode-refund-confirm");
-    document.getElementById("btnRefundActionText").innerText = "返금을確定"; // 返金を確定
+    document.getElementById("btnRefundActionText").innerText = "返金を確定";
   } else {
     completeRefund();
   }
@@ -774,7 +757,7 @@ function openManageScreen() {
   document.getElementById("screenManage").classList.add("active");
 
   renderAllManageViews();
-  if (navigator.onLine && GAS_URL) fetchFromGAS(false);
+  if (navigator.onLine) fetchFromGAS(false);
 }
 function closeManageScreen() {
   soundEffect('tap');
@@ -962,7 +945,7 @@ async function deleteSelectedRows() {
   saveCurrentDayStorage();
   renderAllManageViews();
 
-  if (navigator.onLine && GAS_URL) {
+  if (navigator.onLine) {
     try {
       await sendPostToGAS("delete", { ids: selectedIds });
       fetchFromGAS(false);
@@ -988,7 +971,7 @@ async function restoreRow(id) {
   saveCurrentDayStorage();
   renderAllManageViews();
 
-  if (!navigator.onLine || !GAS_URL) {
+  if (!navigator.onLine) {
     enqueueOrSend("restore", { id: id });
   } else {
     try {
@@ -1010,7 +993,7 @@ async function deleteRefundRow(id) {
   saveCurrentDayStorage();
   renderAllManageViews();
 
-  if (navigator.onLine && GAS_URL) {
+  if (navigator.onLine) {
     try {
       await sendPostToGAS("delete_refund", { ids: [id] });
       fetchFromGAS(false);
@@ -1069,7 +1052,7 @@ async function saveEditRow() {
 
     saveCurrentDayStorage();
 
-    if (navigator.onLine && GAS_URL) {
+    if (navigator.onLine) {
       try {
         await sendPostToGAS("update", { data: orderHistory[index] });
         fetchFromGAS(false);
@@ -1127,7 +1110,7 @@ function startSelectedDay() {
   if (isProdMode) {
     if (!initVal || Number(initVal) < 0) {
       soundEffect('error');
-      alert("【エラー】本番稼働中のため、開始前の有高（釣銭準備金）の入力が必須です！");
+      alert("【エラー】本番稼働中のため、開始前の有高（釣銭準備金）の入力が必須です！\n開始前の有高が入力されていません！");
       return;
     }
   }
@@ -1145,7 +1128,7 @@ function startSelectedDay() {
   trashHistory = JSON.parse(localStorage.getItem(`pos_trash_data_${currentDay}`) || "[]");
 
   updateDayUI();
-  if (navigator.onLine && GAS_URL) fetchFromGAS(false);
+  if (navigator.onLine) fetchFromGAS(false);
 
   alert(`「${currentDay}日目」を開始しました！\n（準備金: ${initVal ? Number(initVal).toLocaleString() + "円" : "未設定"}）`);
   closeSettingsScreen();
@@ -1247,7 +1230,7 @@ function requestResetSheetData() {
 async function executeResetSheetData() {
   executeResetLocal();
 
-  if (navigator.onLine && GAS_URL) {
+  if (navigator.onLine) {
     try {
       await sendPostToGAS("clear_sheet_data", {});
       soundEffect('confirm');
@@ -1370,7 +1353,7 @@ function requestConfirmSettlement() {
   openPasskeyModal("精算を確定し記録します。管理者パスキーを入力:", async () => {
     if (confirm(`【精算確定】\n${currentDay}日目の精算を確定しスプレッドシートへ記録しますか？\n（帳簿残高: ${currentSettleCalculated.bookBalance.toLocaleString()}円 / 実際有高: ${currentSettleCalculated.actualCash.toLocaleString()}円）`)) {
       soundEffect('confirm');
-      if (navigator.onLine && GAS_URL) {
+      if (navigator.onLine) {
         try {
           await sendPostToGAS("save_settlement", { data: currentSettleCalculated });
           alert(`「${currentDay}日目」の精算データをスプレッドシートに記録しました！`);
@@ -1388,7 +1371,7 @@ function requestConfirmSettlement() {
   });
 }
 
-// ── 15. パスキー認証モーダル ──
+// ── 15. パスキー認証モーダル（設定・リセット・精算時用） ──
 function openPasskeyModal(promptText, callback) {
   passkeyEntered = "";
   passkeySuccessCallback = callback;
@@ -1446,7 +1429,7 @@ function saveCurrentDayStorage() {
 
 // ── 16. オフラインキュー ＆ 通信処理 ──
 function enqueueOrSend(action, payload) {
-  if (!navigator.onLine || !GAS_URL) {
+  if (!navigator.onLine) {
     offlineQueue.push({ id: "q_" + Date.now() + "_" + Math.random(), action, payload });
     localStorage.setItem("pos_offline_queue", JSON.stringify(offlineQueue));
     updateOnlineStatus();
@@ -1460,17 +1443,15 @@ function enqueueOrSend(action, payload) {
 }
 
 async function sendPostToGAS(action, payload) {
-  if (!GAS_URL) return;
+  if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) return;
   const formData = new FormData();
   formData.append("data", JSON.stringify({ action: action, day: currentDay, ...payload }));
   await fetch(GAS_URL, { method: "POST", mode: "no-cors", body: formData });
 }
 
 function fetchFromGAS(isManual) {
-  if (!GAS_URL) {
-    if (isManual) alert("レジ設定画面からGoogle Apps ScriptのURLを設定してください。");
-    return;
-  }
+  if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) return;
+  // ロック解除前は同期通信もブロック
   if (!isAppUnlocked && !isManual) return;
   if (!navigator.onLine) {
     if (isManual) alert("オフラインのためスプレッドシートから読み込めません。");
