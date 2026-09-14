@@ -206,40 +206,59 @@ function soundEffect(type, customParam) {
       };
 
       if (sheets === 1) {
-        // 【1枚】現行のままの美しい基準チャイム
-        const notes = [523.25, 659.25, 783.99, 1046.50];
-        notes.forEach((freq, i) => {
-          playTone(freq, i * 0.07, 0.45, 0.25, 'sine');
-        });
-      } else if (sheets === 2) {
-        // 【2枚】新感覚：キュートな上昇ポップシンセ（ペンタトニック上昇）
-        const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
-        notes.forEach((freq, i) => {
-          playTone(freq, i * 0.055, 0.35, 0.23, 'triangle');
-        });
-      } else if (sheets === 3) {
-        // 【3枚】新感覚：軽快なコインゲット風・連打アルペジオ
-        const notes = [523.25, 659.25, 783.99, 987.77, 1318.51]; // C5, E5, G5, B5, E6
-        notes.forEach((freq, i) => {
-          playTone(freq, i * 0.045, 0.3, 0.2, 'sine');
-        });
-      } else if (sheets === 4) {
-        // 【4枚】新感覚：リッチでドラマチックなパワーコード展開
-        playTone(349.23, 0, 0.5, 0.22, 'triangle'); // F4ベース
-        playTone(523.25, 0.06, 0.45, 0.22, 'sine');
-        playTone(659.25, 0.12, 0.45, 0.22, 'sine');
-        playTone(880.00, 0.18, 0.5, 0.25, 'sine');
-      } else {
-        // 【5枚以上】新感覚：最高峰・きらめくスターダスト・ゲインサウンド
-        const baseNotes = [392.00, 587.33, 783.99]; // G4, D5, G5
-        baseNotes.forEach((f, i) => playTone(f, i * 0.03, 0.6, 0.2, 'triangle'));
-        
-        // 高音域のキラキラした連打スパークル
-        const sparkles = [1046.50, 1174.66, 1318.51, 1567.98, 2093.00];
-        sparkles.forEach((freq, i) => {
-          playTone(freq, 0.12 + (i * 0.04), 0.4, 0.18, 'sine');
-        });
-      }
+    // 【1枚】現行のままの美しい基準チャイム
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      playTone(freq, i * 0.07, 0.45, 0.25, 'sine');
+    });
+} else if (sheets === 2) {
+    // 【2枚】ふわっと広がる、神秘的なアンビエント・和音
+    // 深みのあるサイン波と、優しく寄り添うトライアングル波の重ね合わせ
+    const notes = [523.25, 659.25, 783.99, 987.77]; // C5, E5, G5, B5 (Cmaj7)
+    notes.forEach((freq, i) => {
+      playTone(freq, i * 0.08, 0.7, 0.2, 'sine');
+      playTone(freq * 0.5, i * 0.08, 0.8, 0.1, 'triangle'); // オクターブ下で深みをプラス
+    });
+} else if (sheets === 3) {
+    // 【3枚】夜空に溶けるような、クリスタル・アルペジオ
+    // 伸びやかで透き通るような高音の広がり
+    const notes = [587.33, 739.99, 880.00, 1108.73, 1479.98]; // D5, F#5, A5, C#6, F#6 (Dmaj9風)
+    notes.forEach((freq, i) => {
+      playTone(freq, i * 0.06, 0.9, 0.18, 'sine');
+      // 少し遅れてきらめきを追従させる
+      playTone(freq * 1.5, i * 0.06 + 0.03, 0.5, 0.1, 'sine');
+    });
+} else if (sheets === 4) {
+    // 【4枚】オーロラのように揺らめく、ディープ・ドローン
+    // 低音の包み込むような響きと、幾重にも重なる美しいハーモニー
+    const baseFreqs = [293.66, 440.00, 587.33]; // D4, A4, D5
+    baseFreqs.forEach((freq) => {
+      playTone(freq, 0, 1.1, 0.22, 'triangle');
+    });
+    const chord = [739.99, 880.00, 1108.73, 1479.98];
+    chord.forEach((freq, i) => {
+      playTone(freq, 0.1 + (i * 0.05), 0.8, 0.18, 'sine');
+    });
+} else {
+    // 【5枚以上】究極の幻想：星屑が降り注ぐような、極上のエセリアル・サウンド
+    // 低音の重厚な土台
+    const lowNotes = [220.00, 329.63, 440.00]; // A3, E4, A4
+    lowNotes.forEach((freq, i) => {
+      playTone(freq, i * 0.04, 1.4, 0.2, 'triangle');
+    });
+
+    // 中音域の広がりのあるコード
+    const midNotes = [554.37, 659.25, 830.61, 1108.73];
+    midNotes.forEach((freq, i) => {
+      playTone(freq, 0.15 + (i * 0.04), 1.0, 0.18, 'sine');
+    });
+
+    // 高音域の星屑のようなきらめき（連打スパークル）
+    const sparkles = [1318.51, 1661.22, 1975.53, 2217.46, 2637.02, 3135.96];
+    sparkles.forEach((freq, i) => {
+      playTone(freq, 0.3 + (i * 0.035), 0.6, 0.12, 'sine');
+    });
+  }
 
     // 6. 返金完了（温かみのあるベル音）
     } else if (type === 'refund') {
