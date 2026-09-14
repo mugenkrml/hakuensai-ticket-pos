@@ -60,10 +60,10 @@ function cleanTimeStr(str) {
   return s;
 }
 
-// ── Web Audio API による極上・多彩UI効果音エンジン ──
+// ── Web Audio API による極上・多彩UI効果音エンジン（新・段階的完了音対応） ──
 let audioCtx = null;
 
-function soundEffect(type) {
+function soundEffect(type, customParam) {
   if (!isSoundEnabled) return;
 
   try {
@@ -187,22 +187,59 @@ function soundEffect(type) {
         osc.stop(now + delay + 0.08);
       });
 
-    // 5. 会計完了（ポロロ〜ン和音チャイム）
+    // 5. 会計完了（1枚目は現行固定、2〜5枚以上は新・段階的シンセサウンド）
     } else if (type === 'success') {
-      const notes = [523.25, 659.25, 783.99, 1046.50];
-      notes.forEach((freq, i) => {
-        const delay = i * 0.07;
+      const sheets = Number(customParam || 1);
+
+      // 共通の音符鳴らし用ヘルパー
+      const playTone = (freq, delay, dur, gainVal = 0.22, typeName = 'sine') => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = 'sine';
+        osc.type = typeName;
         osc.frequency.setValueAtTime(freq, now + delay);
-        gain.gain.setValueAtTime(0.25, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.45);
+        gain.gain.setValueAtTime(gainVal, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + dur);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(now + delay);
-        osc.stop(now + delay + 0.45);
-      });
+        osc.stop(now + delay + dur);
+      };
+
+      if (sheets === 1) {
+        // 【1枚】現行のままの美しい基準チャイム
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => {
+          playTone(freq, i * 0.07, 0.45, 0.25, 'sine');
+        });
+      } else if (sheets === 2) {
+        // 【2枚】新感覚：キュートな上昇ポップシンセ（ペンタトニック上昇）
+        const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+        notes.forEach((freq, i) => {
+          playTone(freq, i * 0.055, 0.35, 0.23, 'triangle');
+        });
+      } else if (sheets === 3) {
+        // 【3枚】新感覚：軽快なコインゲット風・連打アルペジオ
+        const notes = [523.25, 659.25, 783.99, 987.77, 1318.51]; // C5, E5, G5, B5, E6
+        notes.forEach((freq, i) => {
+          playTone(freq, i * 0.045, 0.3, 0.2, 'sine');
+        });
+      } else if (sheets === 4) {
+        // 【4枚】新感覚：リッチでドラマチックなパワーコード展開
+        playTone(349.23, 0, 0.5, 0.22, 'triangle'); // F4ベース
+        playTone(523.25, 0.06, 0.45, 0.22, 'sine');
+        playTone(659.25, 0.12, 0.45, 0.22, 'sine');
+        playTone(880.00, 0.18, 0.5, 0.25, 'sine');
+      } else {
+        // 【5枚以上】新感覚：最高峰・きらめくスターダスト・ゲインサウンド
+        const baseNotes = [392.00, 587.33, 783.99]; // G4, D5, G5
+        baseNotes.forEach((f, i) => playTone(f, i * 0.03, 0.6, 0.2, 'triangle'));
+        
+        // 高音域のキラキラした連打スパークル
+        const sparkles = [1046.50, 1174.66, 1318.51, 1567.98, 2093.00];
+        sparkles.forEach((freq, i) => {
+          playTone(freq, 0.12 + (i * 0.04), 0.4, 0.18, 'sine');
+        });
+      }
 
     // 6. 返金完了（温かみのあるベル音）
     } else if (type === 'refund') {
@@ -230,7 +267,7 @@ function soundEffect(type) {
         osc.frequency.setValueAtTime(140, now + delay);
         osc.frequency.exponentialRampToValueAtTime(70, now + delay + 0.07);
         gain.gain.setValueAtTime(0.35, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.07);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(now + delay);
@@ -552,7 +589,7 @@ function handlePayAction() {
   }
 }
 
-// ── 6. 販売確定・保存 ──
+// ── 6. 販売確定・保存（枚数を音の関数へ確実に渡す） ──
 function getNextOrderNo() {
   const allOrders = [...orderHistory, ...trashHistory];
   let maxNo = 0;
@@ -564,10 +601,11 @@ function getNextOrderNo() {
 }
 
 function completeOrder() {
-  soundEffect('success');
+  const sheets = Number(saleCountStr);
+  soundEffect('success', sheets); // ★枚数ごとの新しい完了音を渡して実行
+  
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-  const sheets = Number(saleCountStr);
   const received = Number(payReceivedStr);
   const change = received - (sheets * UNIT_PRICE);
 
@@ -1468,72 +1506,3 @@ function fetchFromGAS(isManual) {
 updateSoundUI();
 updateDayUI();
 updateProdModeUI();
-
-// ── 画面右端クイックスクロールバーのタッチ＆ドラッグ制御 ──
-function setupQuickScrollBar(containerId, railId, thumbId) {
-  const container = document.getElementById(containerId);
-  const rail = document.getElementById(railId);
-  const thumb = document.getElementById(thumbId);
-  if (!container || !rail || !thumb) return;
-
-  // コンテナのスクロール位置をつまみに同期
-  function updateThumbPosition() {
-    const scrollHeight = container.scrollHeight - container.clientHeight;
-    if (scrollHeight <= 0) {
-      rail.style.display = "none";
-      return;
-    }
-    rail.style.display = "block";
-    const railHeight = rail.clientHeight - thumb.clientHeight;
-    const currentScrollRatio = container.scrollTop / scrollHeight;
-    thumb.style.top = `${currentScrollRatio * railHeight}px`;
-  }
-
-  container.addEventListener("scroll", updateThumbPosition, { passive: true });
-  window.addEventListener("resize", updateThumbPosition);
-
-  // レールまたはつまみをタップ・ドラッグした時のスクロール処理
-  let isDragging = false;
-
-  function handleTouch(e) {
-    const touch = e.touches ? e.touches[0] : e;
-    const railRect = rail.getBoundingClientRect();
-    const offsetY = touch.clientY - railRect.top - (thumb.clientHeight / 2);
-    const maxRailY = rail.clientHeight - thumb.clientHeight;
-
-    const clampedY = Math.max(0, Math.min(maxRailY, offsetY));
-    const ratio = clampedY / maxRailY;
-
-    container.scrollTop = ratio * (container.scrollHeight - container.clientHeight);
-    updateThumbPosition();
-  }
-
-  rail.addEventListener("touchstart", (e) => {
-    isDragging = true;
-    handleTouch(e);
-  }, { passive: true });
-
-  rail.addEventListener("touchmove", (e) => {
-    if (isDragging) handleTouch(e);
-  }, { passive: true });
-
-  window.addEventListener("touchend", () => { isDragging = false; });
-}
-
-// 画面読み込み時に各スクロールバーを初期化
-document.addEventListener("DOMContentLoaded", () => {
-  setupQuickScrollBar("saleTableContainer", "saleScrollRail", "saleScrollThumb");
-  setupQuickScrollBar("refundTableContainer", "refundScrollRail", "refundScrollThumb");
-});
-
-// 管理画面を開いた時やタブ切り替え時にもスクロールバーを再計算
-const originalRenderAllManageViews = renderAllManageViews;
-renderAllManageViews = function() {
-  originalRenderAllManageViews();
-  setTimeout(() => {
-    const sContainer = document.getElementById("saleTableContainer");
-    if (sContainer) sContainer.dispatchEvent(new Event("scroll"));
-    const rContainer = document.getElementById("refundTableContainer");
-    if (rContainer) rContainer.dispatchEvent(new Event("scroll"));
-  }, 100);
-};
