@@ -1505,4 +1505,4 @@ function fetchFromGAS(isManual) {
 // 起動時初期化
 updateSoundUI();
 updateDayUI();
-updateProdModeUI();
+updateProdModeUI();　
