@@ -60,22 +60,42 @@ function cleanTimeStr(str) {
   return s;
 }
 
-// ── Web Audio API による極上・多彩UI効果音エンジン ──
+// ── Web Audio API による極上・多彩UI効果音エンジン（枚数連動豪華完了音対応） ──
 let audioCtx = null;
+let isAudioUnlocked = false;
 
-function soundEffect(type) {
+function initAndUnlockAudio() {
+  if (isAudioUnlocked && audioCtx && audioCtx.state === 'running') return;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!audioCtx && AudioContextClass) {
+      audioCtx = new AudioContextClass();
+    }
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    const silentBuffer = audioCtx.createBuffer(1, 1, 22050);
+    const source = audioCtx.createBufferSource();
+    source.buffer = silentBuffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+    isAudioUnlocked = true;
+  } catch (e) {
+    console.warn("Audio unlock error:", e);
+  }
+}
+
+window.addEventListener('touchstart', initAndUnlockAudio, { passive: true });
+window.addEventListener('touchend', initAndUnlockAudio, { passive: true });
+window.addEventListener('click', initAndUnlockAudio, { passive: true });
+
+function soundEffect(type, customParam) {
   if (!isSoundEnabled) return;
+  initAndUnlockAudio();
+  if (!audioCtx) return;
 
   try {
-    if (!audioCtx) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtx = new AudioContextClass();
-      }
-    }
-
-    if (!audioCtx) return;
-
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
@@ -187,22 +207,62 @@ function soundEffect(type) {
         osc.stop(now + delay + 0.08);
       });
 
-    // 5. 会計完了（ポロロ〜ン和音チャイム）
+    // 5. 会計完了（枚数に応じた可変ラグジュアリーサウンド）
     } else if (type === 'success') {
-      const notes = [523.25, 659.25, 783.99, 1046.50];
-      notes.forEach((freq, i) => {
-        const delay = i * 0.07;
+      const sheets = Number(customParam || 1);
+
+      const playBell = (freq, delay, dur = 0.45, gainVal = 0.22) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now + delay);
-        gain.gain.setValueAtTime(0.25, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.45);
+        gain.gain.setValueAtTime(gainVal, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + dur);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(now + delay);
-        osc.stop(now + delay + 0.45);
-      });
+        osc.stop(now + delay + dur);
+      };
+
+      const playHarpPluck = (freq, delay) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + delay);
+        gain.gain.setValueAtTime(0.18, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.18);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.18);
+      };
+
+      if (sheets === 1) {
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => playBell(freq, i * 0.07, 0.45, 0.24));
+      } else if (sheets === 2) {
+        playBell(261.63, 0, 0.55, 0.22);
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((freq, i) => playBell(freq, i * 0.065, 0.48, 0.22));
+      } else if (sheets === 3) {
+        const harpNotes = [392.00, 523.25, 659.25, 783.99];
+        harpNotes.forEach((freq, i) => playHarpPluck(freq, i * 0.045));
+        const bellNotes = [523.25, 659.25, 1046.50, 1318.51];
+        bellNotes.forEach((freq, i) => playBell(freq, 0.18 + (i * 0.06), 0.5, 0.22));
+      } else if (sheets === 4) {
+        playBell(261.63, 0, 0.65, 0.2);
+        const harpNotes = [329.63, 392.00, 493.88, 587.33, 659.25];
+        harpNotes.forEach((freq, i) => playHarpPluck(freq, i * 0.035));
+        const bellNotes = [659.25, 783.99, 987.77, 1174.66, 1567.98];
+        bellNotes.forEach((freq, i) => playBell(freq, 0.16 + (i * 0.055), 0.55, 0.2));
+      } else {
+        playBell(261.63, 0, 0.75, 0.25);
+        playBell(392.00, 0.03, 0.75, 0.18);
+        const sweep = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+        sweep.forEach((freq, i) => playHarpPluck(freq, i * 0.03));
+        const sparkles = [1046.50, 1318.51, 1567.98, 2093.00];
+        sparkles.forEach((freq, i) => playBell(freq, 0.22 + (i * 0.05), 0.6, 0.18));
+      }
 
     // 6. 返金完了（温かみのあるベル音）
     } else if (type === 'refund') {
@@ -256,7 +316,6 @@ function inputBootPasskey(num) {
       setTimeout(() => {
         isAppUnlocked = true;
         document.getElementById("appLockScreen").classList.add("unlocked");
-        // ロック解除後に初回同期を開始
         if (navigator.onLine) fetchFromGAS(false);
       }, 200);
     } else {
@@ -360,8 +419,6 @@ updateOnlineStatus();
 
 async function flushOfflineQueue() {
   if (offlineQueue.length === 0 || !navigator.onLine) return;
-  console.log("未送信キュー送信中...", offlineQueue.length, "件");
-
   const queueToSend = [...offlineQueue];
   for (const item of queueToSend) {
     try {
@@ -369,7 +426,6 @@ async function flushOfflineQueue() {
       offlineQueue = offlineQueue.filter(q => q.id !== item.id);
       localStorage.setItem("pos_offline_queue", JSON.stringify(offlineQueue));
     } catch (err) {
-      console.warn("キュー再送中断:", err);
       break;
     }
   }
@@ -552,7 +608,7 @@ function handlePayAction() {
   }
 }
 
-// ── 6. 販売確定・保存 ──
+// ── 6. 販売確定・保存（枚数を音の関数へ渡す） ──
 function getNextOrderNo() {
   const allOrders = [...orderHistory, ...trashHistory];
   let maxNo = 0;
@@ -564,10 +620,11 @@ function getNextOrderNo() {
 }
 
 function completeOrder() {
-  soundEffect('success');
+  const sheets = Number(saleCountStr);
+  soundEffect('success', sheets); // ★枚数に応じた豪華な完了音
+
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-  const sheets = Number(saleCountStr);
   const received = Number(payReceivedStr);
   const change = received - (sheets * UNIT_PRICE);
 
@@ -1333,7 +1390,7 @@ function requestConfirmSettlement() {
   });
 }
 
-// ── 15. パスキー認証モーダル（設定・リセット・精算時用） ──
+// ── 15. パスキー認証モーダル ──
 function openPasskeyModal(promptText, callback) {
   passkeyEntered = "";
   passkeySuccessCallback = callback;
@@ -1413,7 +1470,6 @@ async function sendPostToGAS(action, payload) {
 
 function fetchFromGAS(isManual) {
   if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) return;
-  // ロック解除前は同期通信もブロック
   if (!isAppUnlocked && !isManual) return;
   if (!navigator.onLine) {
     if (isManual) alert("オフラインのためスプレッドシートから読み込めません。");
@@ -1464,11 +1520,6 @@ function fetchFromGAS(isManual) {
   document.body.appendChild(script);
 }
 
-// 起動時初期化
-updateSoundUI();
-updateDayUI();
-updateProdModeUI();
-
 // ── 画面右端クイックスクロールバーのタッチ＆ドラッグ制御 ──
 function setupQuickScrollBar(containerId, railId, thumbId) {
   const container = document.getElementById(containerId);
@@ -1476,7 +1527,6 @@ function setupQuickScrollBar(containerId, railId, thumbId) {
   const thumb = document.getElementById(thumbId);
   if (!container || !rail || !thumb) return;
 
-  // コンテナのスクロール位置をつまみに同期
   function updateThumbPosition() {
     const scrollHeight = container.scrollHeight - container.clientHeight;
     if (scrollHeight <= 0) {
@@ -1492,7 +1542,6 @@ function setupQuickScrollBar(containerId, railId, thumbId) {
   container.addEventListener("scroll", updateThumbPosition, { passive: true });
   window.addEventListener("resize", updateThumbPosition);
 
-  // レールまたはつまみをタップ・ドラッグした時のスクロール処理
   let isDragging = false;
 
   function handleTouch(e) {
@@ -1520,13 +1569,11 @@ function setupQuickScrollBar(containerId, railId, thumbId) {
   window.addEventListener("touchend", () => { isDragging = false; });
 }
 
-// 画面読み込み時に各スクロールバーを初期化
 document.addEventListener("DOMContentLoaded", () => {
   setupQuickScrollBar("saleTableContainer", "saleScrollRail", "saleScrollThumb");
   setupQuickScrollBar("refundTableContainer", "refundScrollRail", "refundScrollThumb");
 });
 
-// 管理画面を開いた時やタブ切り替え時にもスクロールバーを再計算
 const originalRenderAllManageViews = renderAllManageViews;
 renderAllManageViews = function() {
   originalRenderAllManageViews();
@@ -1537,3 +1584,8 @@ renderAllManageViews = function() {
     if (rContainer) rContainer.dispatchEvent(new Event("scroll"));
   }, 100);
 };
+
+// 起動時初期化
+updateSoundUI();
+updateDayUI();
+updateProdModeUI();
