@@ -1,9 +1,7 @@
-// ★★★ Google Apps Script ウェブアプリURL ★★★
-const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbzvkpbYbCp_2grTdcpxu8m5IOXrTGLSFhdJTXP8Z3BXKHWBNDMMBh2rcUx6VQHHX4Nq5g/exec";
+// ★★★ セキュア設定 ★★★
+const ADMIN_PASSKEY = localStorage.getItem("pos_admin_passkey") || "1207";
+const DEFAULT_GAS_URL = "";
 let GAS_URL = localStorage.getItem("pos_gas_url") || DEFAULT_GAS_URL;
-
-// 管理者パスキー
-const ADMIN_PASSKEY = "1207";
 
 // アプリの起動ロック状態（リロードするまで解除維持）
 let isAppUnlocked = false;
@@ -316,7 +314,7 @@ function inputBootPasskey(num) {
       setTimeout(() => {
         isAppUnlocked = true;
         document.getElementById("appLockScreen").classList.add("unlocked");
-        if (navigator.onLine) fetchFromGAS(false);
+        if (navigator.onLine && GAS_URL) fetchFromGAS(false);
       }, 200);
     } else {
       soundEffect('error');
@@ -408,7 +406,7 @@ async function updateOnlineStatus() {
     }
   });
 
-  if (isOnline && offlineQueue.length > 0) {
+  if (isOnline && offlineQueue.length > 0 && GAS_URL) {
     await flushOfflineQueue();
     fetchFromGAS(false);
   }
@@ -418,7 +416,7 @@ window.addEventListener("offline", updateOnlineStatus);
 updateOnlineStatus();
 
 async function flushOfflineQueue() {
-  if (offlineQueue.length === 0 || !navigator.onLine) return;
+  if (offlineQueue.length === 0 || !navigator.onLine || !GAS_URL) return;
   const queueToSend = [...offlineQueue];
   for (const item of queueToSend) {
     try {
@@ -608,7 +606,7 @@ function handlePayAction() {
   }
 }
 
-// ── 6. 販売確定・保存（枚数を音の関数へ渡す） ──
+// ── 6. 販売確定・保存（枚数を音の関数へ確実に渡す） ──
 function getNextOrderNo() {
   const allOrders = [...orderHistory, ...trashHistory];
   let maxNo = 0;
@@ -621,7 +619,7 @@ function getNextOrderNo() {
 
 function completeOrder() {
   const sheets = Number(saleCountStr);
-  soundEffect('success', sheets); // ★枚数に応じた豪華な完了音
+  soundEffect('success', sheets); // ★枚数ごとの豪華な完了音を確実に実行
 
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
@@ -704,7 +702,7 @@ function handleRefundAction() {
     isRefundConfirmed = true;
     const btn = document.getElementById("btnRefundAction");
     btn.classList.add("mode-refund-confirm");
-    document.getElementById("btnRefundActionText").innerText = "返金を確定";
+    document.getElementById("btnRefundActionText").innerText = "返금을確定"; // 返金を確定
   } else {
     completeRefund();
   }
@@ -776,7 +774,7 @@ function openManageScreen() {
   document.getElementById("screenManage").classList.add("active");
 
   renderAllManageViews();
-  if (navigator.onLine) fetchFromGAS(false);
+  if (navigator.onLine && GAS_URL) fetchFromGAS(false);
 }
 function closeManageScreen() {
   soundEffect('tap');
@@ -964,7 +962,7 @@ async function deleteSelectedRows() {
   saveCurrentDayStorage();
   renderAllManageViews();
 
-  if (navigator.onLine) {
+  if (navigator.onLine && GAS_URL) {
     try {
       await sendPostToGAS("delete", { ids: selectedIds });
       fetchFromGAS(false);
@@ -990,7 +988,7 @@ async function restoreRow(id) {
   saveCurrentDayStorage();
   renderAllManageViews();
 
-  if (!navigator.onLine) {
+  if (!navigator.onLine || !GAS_URL) {
     enqueueOrSend("restore", { id: id });
   } else {
     try {
@@ -1012,7 +1010,7 @@ async function deleteRefundRow(id) {
   saveCurrentDayStorage();
   renderAllManageViews();
 
-  if (navigator.onLine) {
+  if (navigator.onLine && GAS_URL) {
     try {
       await sendPostToGAS("delete_refund", { ids: [id] });
       fetchFromGAS(false);
@@ -1071,7 +1069,7 @@ async function saveEditRow() {
 
     saveCurrentDayStorage();
 
-    if (navigator.onLine) {
+    if (navigator.onLine && GAS_URL) {
       try {
         await sendPostToGAS("update", { data: orderHistory[index] });
         fetchFromGAS(false);
@@ -1129,7 +1127,7 @@ function startSelectedDay() {
   if (isProdMode) {
     if (!initVal || Number(initVal) < 0) {
       soundEffect('error');
-      alert("【エラー】本番稼働中のため、開始前の有高（釣銭準備金）の入力が必須です！\n開始前の有高が入力されていません！");
+      alert("【エラー】本番稼働中のため、開始前の有高（釣銭準備金）の入力が必須です！");
       return;
     }
   }
@@ -1147,7 +1145,7 @@ function startSelectedDay() {
   trashHistory = JSON.parse(localStorage.getItem(`pos_trash_data_${currentDay}`) || "[]");
 
   updateDayUI();
-  if (navigator.onLine) fetchFromGAS(false);
+  if (navigator.onLine && GAS_URL) fetchFromGAS(false);
 
   alert(`「${currentDay}日目」を開始しました！\n（準備金: ${initVal ? Number(initVal).toLocaleString() + "円" : "未設定"}）`);
   closeSettingsScreen();
@@ -1249,7 +1247,7 @@ function requestResetSheetData() {
 async function executeResetSheetData() {
   executeResetLocal();
 
-  if (navigator.onLine) {
+  if (navigator.onLine && GAS_URL) {
     try {
       await sendPostToGAS("clear_sheet_data", {});
       soundEffect('confirm');
@@ -1372,7 +1370,7 @@ function requestConfirmSettlement() {
   openPasskeyModal("精算を確定し記録します。管理者パスキーを入力:", async () => {
     if (confirm(`【精算確定】\n${currentDay}日目の精算を確定しスプレッドシートへ記録しますか？\n（帳簿残高: ${currentSettleCalculated.bookBalance.toLocaleString()}円 / 実際有高: ${currentSettleCalculated.actualCash.toLocaleString()}円）`)) {
       soundEffect('confirm');
-      if (navigator.onLine) {
+      if (navigator.onLine && GAS_URL) {
         try {
           await sendPostToGAS("save_settlement", { data: currentSettleCalculated });
           alert(`「${currentDay}日目」の精算データをスプレッドシートに記録しました！`);
@@ -1448,7 +1446,7 @@ function saveCurrentDayStorage() {
 
 // ── 16. オフラインキュー ＆ 通信処理 ──
 function enqueueOrSend(action, payload) {
-  if (!navigator.onLine) {
+  if (!navigator.onLine || !GAS_URL) {
     offlineQueue.push({ id: "q_" + Date.now() + "_" + Math.random(), action, payload });
     localStorage.setItem("pos_offline_queue", JSON.stringify(offlineQueue));
     updateOnlineStatus();
@@ -1462,14 +1460,17 @@ function enqueueOrSend(action, payload) {
 }
 
 async function sendPostToGAS(action, payload) {
-  if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) return;
+  if (!GAS_URL) return;
   const formData = new FormData();
   formData.append("data", JSON.stringify({ action: action, day: currentDay, ...payload }));
   await fetch(GAS_URL, { method: "POST", mode: "no-cors", body: formData });
 }
 
 function fetchFromGAS(isManual) {
-  if (!GAS_URL || GAS_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) return;
+  if (!GAS_URL) {
+    if (isManual) alert("レジ設定画面からGoogle Apps ScriptのURLを設定してください。");
+    return;
+  }
   if (!isAppUnlocked && !isManual) return;
   if (!navigator.onLine) {
     if (isManual) alert("オフラインのためスプレッドシートから読み込めません。");
@@ -1519,71 +1520,6 @@ function fetchFromGAS(isManual) {
 
   document.body.appendChild(script);
 }
-
-// ── 画面右端クイックスクロールバーのタッチ＆ドラッグ制御 ──
-function setupQuickScrollBar(containerId, railId, thumbId) {
-  const container = document.getElementById(containerId);
-  const rail = document.getElementById(railId);
-  const thumb = document.getElementById(thumbId);
-  if (!container || !rail || !thumb) return;
-
-  function updateThumbPosition() {
-    const scrollHeight = container.scrollHeight - container.clientHeight;
-    if (scrollHeight <= 0) {
-      rail.style.display = "none";
-      return;
-    }
-    rail.style.display = "block";
-    const railHeight = rail.clientHeight - thumb.clientHeight;
-    const currentScrollRatio = container.scrollTop / scrollHeight;
-    thumb.style.top = `${currentScrollRatio * railHeight}px`;
-  }
-
-  container.addEventListener("scroll", updateThumbPosition, { passive: true });
-  window.addEventListener("resize", updateThumbPosition);
-
-  let isDragging = false;
-
-  function handleTouch(e) {
-    const touch = e.touches ? e.touches[0] : e;
-    const railRect = rail.getBoundingClientRect();
-    const offsetY = touch.clientY - railRect.top - (thumb.clientHeight / 2);
-    const maxRailY = rail.clientHeight - thumb.clientHeight;
-
-    const clampedY = Math.max(0, Math.min(maxRailY, offsetY));
-    const ratio = clampedY / maxRailY;
-
-    container.scrollTop = ratio * (container.scrollHeight - container.clientHeight);
-    updateThumbPosition();
-  }
-
-  rail.addEventListener("touchstart", (e) => {
-    isDragging = true;
-    handleTouch(e);
-  }, { passive: true });
-
-  rail.addEventListener("touchmove", (e) => {
-    if (isDragging) handleTouch(e);
-  }, { passive: true });
-
-  window.addEventListener("touchend", () => { isDragging = false; });
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  setupQuickScrollBar("saleTableContainer", "saleScrollRail", "saleScrollThumb");
-  setupQuickScrollBar("refundTableContainer", "refundScrollRail", "refundScrollThumb");
-});
-
-const originalRenderAllManageViews = renderAllManageViews;
-renderAllManageViews = function() {
-  originalRenderAllManageViews();
-  setTimeout(() => {
-    const sContainer = document.getElementById("saleTableContainer");
-    if (sContainer) sContainer.dispatchEvent(new Event("scroll"));
-    const rContainer = document.getElementById("refundTableContainer");
-    if (rContainer) rContainer.dispatchEvent(new Event("scroll"));
-  }, 100);
-};
 
 // 起動時初期化
 updateSoundUI();
